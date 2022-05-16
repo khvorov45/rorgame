@@ -2,18 +2,87 @@ const win = @import("windows_bindings.zig");
 const Window = @import("window.zig").Window;
 
 pub const PlatformWindow = struct {
-    hwnd: win.HWND = undefined,
+    input_modified: bool,
+    hwnd: win.HWND,
 };
 
 pub fn init(window: *Window, width: i32, height: i32) void {
+
+    const class_name = win.L("rorgameClass");
+    const module = win.GetModuleHandleW(null);
+    const instance = @ptrCast(win.HINSTANCE, module);
+
+    const windowClass = win.WNDCLASSEXW{
+        .style = win.CS_VREDRAW | win.CS_HREDRAW,
+        .lpfnWndProc = wndProc,
+        .hInstance = instance,
+        .hCursor = win.LoadCursorA(null, win.IDC_ARROW),
+        .hbrBackground = @ptrCast(win.HBRUSH, win.GetStockObject(win.BLACK_BRUSH)),
+        .lpszClassName = class_name,
+    };
+    _ = win.RegisterClassExW(&windowClass);
+
     window.platform.hwnd = win.CreateWindowExW(
         win.WS_EX_APPWINDOW, 
-        win.L("rorgameClass"), win.L("rorgame"),
+        class_name, win.L("rorgame"),
         win.WS_OVERLAPPEDWINDOW,
         win.CW_USEDEFAULT, win.CW_USEDEFAULT, width, height,
         null, null, null, null,
     );
 
+    // NOTE(khvorov) to avoid a white flash
+    _ = win.ShowWindow(window.platform.hwnd, win.SW_SHOWMINIMIZED);
+    _ = win.ShowWindow(window.platform.hwnd, win.SW_SHOWNORMAL);
+
+    _ = win.SetWindowLongPtrW(window.platform.hwnd, win.GWLP_USERDATA, @bitCast(win.LONG_PTR, @ptrToInt(window)));
+
     window.is_running = true;
+    window.width = width;
+    window.height = height;
 }
 
+fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(win.WINAPI) win.LRESULT {
+    var window = @intToPtr(?*Window, @bitCast(usize, win.GetWindowLongPtrW(hwnd, win.GWLP_USERDATA)));
+    var result: win.LRESULT = undefined;
+    
+    if (window != null) {
+        switch (msg) {
+        win.WM_CLOSE, win.WM_DESTROY => {
+            window.?.is_running = false;
+            window.?.platform.input_modified = true;
+        },
+
+        win.WM_PAINT => {
+            window.?.platform.input_modified = true;
+        },
+        
+        else => {}
+        }
+    }
+
+    result = win.DefWindowProcW(hwnd, msg, wparam, lparam); 
+    return result;
+}
+
+pub fn waitForInput(window: *Window) void {
+
+    window.platform.input_modified = false;
+
+    while (true) {
+        var msg: win.MSG = undefined;
+        
+        if (!window.platform.input_modified) {
+            _ = win.GetMessageW(&msg, window.platform.hwnd, 0, 0);
+        } else if (win.PeekMessageW(&msg, window.platform.hwnd, 0, 0, win.PM_REMOVE) == win.FALSE) {
+            break;
+        }
+
+        switch (msg.message) {
+
+        else => {
+            _ = win.TranslateMessage(&msg);
+            _ = win.DispatchMessageW(&msg);
+        }
+        }
+    }
+}
