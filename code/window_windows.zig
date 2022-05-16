@@ -4,6 +4,8 @@ const Window = @import("window.zig").Window;
 pub const PlatformWindow = struct {
     input_modified: bool,
     hwnd: win.HWND,
+    bmi: win.BITMAPINFO,
+    hdc: win.HDC,
 };
 
 pub fn init(window: *Window, width: i32, height: i32) void {
@@ -29,6 +31,9 @@ pub fn init(window: *Window, width: i32, height: i32) void {
         win.CW_USEDEFAULT, win.CW_USEDEFAULT, width, height,
         null, null, null, null,
     );
+
+    window.platform.hdc = win.GetDC(window.platform.hwnd);
+    window.platform.bmi = win.BITMAPINFO{.bmiHeader = win.BITMAPINFOHEADER{}};
 
     // NOTE(khvorov) to avoid a white flash
     _ = win.ShowWindow(window.platform.hwnd, win.SW_SHOWMINIMIZED);
@@ -85,4 +90,16 @@ pub fn waitForInput(window: *Window) void {
         }
         }
     }
+}
+
+pub fn displayPixels(window: *Window, pixels: []u32, pixels_width: i32, pixels_height: i32) void {
+    window.platform.bmi.bmiHeader.biWidth = pixels_width;
+    window.platform.bmi.bmiHeader.biHeight = -pixels_height; // NOTE(khvorov) Negative = top-down
+    _ = win.StretchDIBits(
+        window.platform.hdc,
+        0, 0, window.width, window.height,
+        0, 0, pixels_width, pixels_height,
+        &pixels[0], &window.platform.bmi,
+        win.DIB_RGB_COLORS, win.SRCCOPY
+    );
 }

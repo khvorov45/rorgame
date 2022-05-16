@@ -25,6 +25,24 @@ pub extern "user32" fn DispatchMessageW(lpMsg: *const MSG) callconv(WINAPI) LRES
 pub extern "user32" fn SetWindowLongPtrW(hWnd: HWND, nIndex: i32, dwNewLong: LONG_PTR) callconv(WINAPI) LONG_PTR;
 pub extern "user32" fn GetWindowLongPtrW(hWnd: HWND, nIndex: i32) callconv(WINAPI) LONG_PTR;
 pub extern "user32" fn PeekMessageW(lpMsg: *MSG, hWnd: ?HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) callconv(WINAPI) BOOL;
+pub extern "kernel32" fn VirtualAlloc(lpAddress: ?LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD) callconv(WINAPI) ?LPVOID;
+pub extern "user32" fn GetDC(hWnd: ?HWND) callconv(WINAPI) HDC;
+
+pub extern "gdi32" fn StretchDIBits(
+    hdc: HDC,
+    xDest: i32,
+    yDest: i32,
+    DestWidth: i32,
+    DestHeight: i32,
+    xSrc: i32,
+    ySrc: i32,
+    SrcWidth: i32,
+    SrcHeight: i32,
+    lpBits: LPCVOID,
+    lpbmi: *const BITMAPINFO,
+    iUsage: UINT,
+    rop: DWORD,
+) callconv(WINAPI) i32;
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;
@@ -1223,3 +1241,79 @@ pub const WM_RASDIALEVENT = 0xCCCD;
 pub const PM_NOREMOVE = 0x0000;
 pub const PM_REMOVE = 0x0001;
 pub const PM_NOYIELD = 0x0002;
+
+pub const MEM_COMMIT = 0x1000;
+pub const MEM_RESERVE = 0x2000;
+pub const MEM_FREE = 0x10000;
+pub const MEM_RESET = 0x80000;
+pub const MEM_RESET_UNDO = 0x1000000;
+pub const MEM_LARGE_PAGES = 0x20000000;
+pub const MEM_PHYSICAL = 0x400000;
+pub const MEM_TOP_DOWN = 0x100000;
+pub const MEM_WRITE_WATCH = 0x200000;
+
+pub const PAGE_EXECUTE = 0x10;
+pub const PAGE_EXECUTE_READ = 0x20;
+pub const PAGE_EXECUTE_READWRITE = 0x40;
+pub const PAGE_EXECUTE_WRITECOPY = 0x80;
+pub const PAGE_NOACCESS = 0x01;
+pub const PAGE_READONLY = 0x02;
+pub const PAGE_READWRITE = 0x04;
+pub const PAGE_WRITECOPY = 0x08;
+pub const PAGE_TARGETS_INVALID = 0x40000000;
+pub const PAGE_TARGETS_NO_UPDATE = 0x40000000; // Same as PAGE_TARGETS_INVALID
+pub const PAGE_GUARD = 0x100;
+pub const PAGE_NOCACHE = 0x200;
+pub const PAGE_WRITECOMBINE = 0x400;
+
+pub const BITMAPINFO = extern struct {
+    bmiHeader: BITMAPINFOHEADER,
+    bmiColors: [1]RGBQUAD = [1]RGBQUAD{RGBQUAD{}},
+};
+
+pub const BITMAPINFOHEADER = extern struct {
+    biSize: DWORD = @sizeOf(BITMAPINFOHEADER),
+    biWidth: LONG = 0,
+    biHeight: LONG = 0,
+    biPlanes: WORD = 1,
+    biBitCount: WORD = 32,
+    biCompression: DWORD = BI_RGB,
+    biSizeImage: DWORD = 0,
+    biXPelsPerMeter: LONG = 0,
+    biYPelsPerMeter: LONG = 0,
+    biClrUsed: DWORD = 0,
+    biClrImportant: DWORD = 0,
+};
+
+pub const RGBQUAD = extern struct {
+    rgbBlue: BYTE = 0,
+    rgbGreen: BYTE = 0,
+    rgbRed: BYTE = 0,
+    rgbReserved: BYTE = 0,
+};
+
+pub const BI_RGB = 0;
+pub const BI_RLE8 = 1;
+pub const BI_RLE4 = 2;
+pub const BI_BITFIELDS = 3;
+pub const BI_JPEG = 4;
+pub const BI_PNG = 5;
+
+pub const DIB_RGB_COLORS = 0;
+pub const DIB_PAL_COLORS = 1;
+
+pub const SRCCOPY = 0x00CC0020;
+pub const SRCPAINT = 0x00EE0086;
+pub const SRCAND = 0x008800C6;
+pub const SRCINVERT = 0x00660046;
+pub const SRCERASE = 0x00440328;
+pub const NOTSRCCOPY = 0x00330008;
+pub const NOTSRCERASE = 0x001100A6;
+pub const MERGECOPY = 0x00C000CA;
+pub const MERGEPAINT = 0x00BB0226;
+pub const PATCOPY = 0x00F00021;
+pub const PATPAINT = 0x00FB0A09;
+pub const PATINVERT = 0x005A0049;
+pub const DSTINVERT = 0x00550009;
+pub const BLACKNESS = 0x00000042;
+pub const WHITENESS = 0x00FF0062;
