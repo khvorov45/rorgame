@@ -15,7 +15,7 @@ pub fn main() !void {
 
     while (window.is_running) {
 
-        window.waitForInput();
+        window.pollForInput();
 
         renderer.clearBuffers(window.width, window.height);
 

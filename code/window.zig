@@ -13,8 +13,8 @@ pub const Window = struct {
         platform.init(window, width, height);
     }
 
-    pub fn waitForInput(window: *Window) void {
-        platform.waitForInput(window);
+    pub fn pollForInput(window: *Window) void {
+        platform.pollForInput(window);
     }
 
     pub fn displayPixels(window: *Window, pixels: []u32, px_width: i32, px_height: i32) void {

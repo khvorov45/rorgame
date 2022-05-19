@@ -2,7 +2,6 @@ const win = @import("windows_bindings.zig");
 const Window = @import("window.zig").Window;
 
 pub const PlatformWindow = struct {
-    input_modified: bool,
     hwnd: win.HWND,
     bmi: win.BITMAPINFO,
     hdc: win.HDC,
@@ -54,11 +53,6 @@ fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM
         switch (msg) {
         win.WM_CLOSE, win.WM_DESTROY => {
             window.?.is_running = false;
-            window.?.platform.input_modified = true;
-        },
-
-        win.WM_PAINT => {
-            window.?.platform.input_modified = true;
         },
         
         else => {}
@@ -69,19 +63,11 @@ fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM
     return result;
 }
 
-pub fn waitForInput(window: *Window) void {
+pub fn pollForInput(window: *Window) void {
 
-    window.platform.input_modified = false;
-
-    while (true) {
-        var msg: win.MSG = undefined;
+    var msg: win.MSG = undefined;
+    while (win.PeekMessageW(&msg, window.platform.hwnd, 0, 0, win.PM_REMOVE) == win.TRUE) {
         
-        if (!window.platform.input_modified) {
-            _ = win.GetMessageW(&msg, window.platform.hwnd, 0, 0);
-        } else if (win.PeekMessageW(&msg, window.platform.hwnd, 0, 0, win.PM_REMOVE) == win.FALSE) {
-            break;
-        }
-
         switch (msg.message) {
 
         else => {
