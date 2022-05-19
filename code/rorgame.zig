@@ -14,7 +14,6 @@ pub fn main() !void {
     renderer.init(7680, 4320, virtual_arena_allocator);
 
     while (window.is_running) {
-
         window.pollForInput();
 
         renderer.clearBuffers(window.width, window.height);

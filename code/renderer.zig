@@ -8,7 +8,6 @@ pub const Renderer = struct {
     max_height: i32,
 
     pub fn init(renderer: *Renderer, max_width: i32, max_height: i32, allocator: mem.Allocator) void {
-
         renderer.pixels = allocator.alloc(u32, @intCast(usize, max_width * max_height)) catch unreachable;
 
         renderer.width = 0;
