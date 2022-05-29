@@ -43,7 +43,7 @@ pub const VirtualArena = struct {
     pub fn new(comptime reserve: usize, comptime commit: usize) !VirtualArena {
         comptime assert(commit <= reserve);
         const reserve_result = try platform.reserve(reserve);
-        const commit_result = platform.commit(reserve_result.ptr, commit);
+        const commit_result = try platform.commit(reserve_result.ptr, commit);
         var varena = VirtualArena{
             .base = reserve_result.ptr,
             .reserved = reserve_result.size_actual,
@@ -57,8 +57,6 @@ pub const VirtualArena = struct {
         _ = len_align;
         _ = ret_addr;
 
-        var result: Error![]u8 = undefined;
-
         var base_aligned = varena.base + varena.used;
         var size_aligned = size;
         alignPtr(&base_aligned, ptr_align, &size_aligned);
@@ -67,18 +65,17 @@ pub const VirtualArena = struct {
         const reserved_and_free = varena.reserved - varena.used;
 
         if (committed_and_free >= size_aligned) {
-            result = base_aligned[0..size];
             varena.used += size_aligned;
+            return base_aligned[0..size];
         } else if (reserved_and_free >= size_aligned) {
-            varena.committed = platform.commit(varena.base, varena.used + size_aligned);
-            result = base_aligned[0..size];
+            const to_commit = varena.used + size_aligned;
+            varena.committed = platform.commit(varena.base, to_commit) catch return error.OutOfMemory;
             varena.used += size_aligned;
+            return base_aligned[0..size];
         } else {
             log.err("virtual arena {} out of memory, asked for {} bytes", .{ varena, size_aligned });
-            result = error.OutOfMemory;
+            return error.OutOfMemory;
         }
-
-        return result;
     }
 
     fn resize(varena: *VirtualArena, buf: []u8, buf_align: u29, new_len: usize, len_align: u29, ret_addr: usize) ?usize {
