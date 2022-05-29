@@ -62,21 +62,16 @@ pub const Window = struct {
     }
 
     fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(win.WINAPI) win.LRESULT {
-        var window = @intToPtr(?*Window, @bitCast(usize, win.GetWindowLongPtrW(hwnd, win.GWLP_USERDATA)));
-        var result: win.LRESULT = undefined;
+        var maybe_window = @intToPtr(?*Window, @bitCast(usize, win.GetWindowLongPtrW(hwnd, win.GWLP_USERDATA)));
 
-        if (window != null) {
+        if (maybe_window) |window| {
             switch (msg) {
-                win.WM_CLOSE, win.WM_DESTROY => {
-                    window.?.is_running = false;
-                },
-
+                win.WM_CLOSE, win.WM_DESTROY => window.is_running = false,
                 else => {},
             }
         }
 
-        result = win.DefWindowProcW(hwnd, msg, wparam, lparam);
-        return result;
+        return win.DefWindowProcW(hwnd, msg, wparam, lparam);
     }
 
     pub fn pollForInput(window: *Window) void {
