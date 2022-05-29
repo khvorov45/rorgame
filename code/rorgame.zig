@@ -24,7 +24,9 @@ pub fn main() noreturn {
     const virtual_arena_allocator = virtual_arena.allocator();
 
     var window: wnd.Window = undefined;
-    window.init(math.V2i{ .x = 1280, .y = 720 });
+    window.init(math.V2i{ .x = 1280, .y = 720 }) catch |err| {
+        std.debug.panic("failed to init window: {}", .{err});
+    };
 
     var renderer = rdr.Renderer.new(window.dim, virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to create renderer: {}", .{err});

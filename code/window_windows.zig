@@ -1,5 +1,7 @@
 const math = @import("math.zig");
+const log = @import("log.zig");
 const win = @import("windows_bindings.zig");
+const output_windows_error = @import("log_windows.zig").output_windows_error;
 
 pub const PlatformWindow = struct {
     hwnd: win.HWND,
@@ -12,9 +14,11 @@ pub const Window = struct {
     dim: math.V2i,
     platform: PlatformWindow,
 
-    pub fn init(window: *Window, dim: math.V2i) void {
+    pub fn init(window: *Window, dim: math.V2i) !void {
+        errdefer output_windows_error();
+
         const class_name = win.L("rorgameClass");
-        const module = win.GetModuleHandleW(null);
+        const module = win.GetModuleHandleW(null) orelse return error.GetModuleHandleW;
         const instance = @ptrCast(win.HINSTANCE, module);
 
         const windowClass = win.WNDCLASSEXW{
@@ -25,7 +29,7 @@ pub const Window = struct {
             .hbrBackground = @ptrCast(win.HBRUSH, win.GetStockObject(win.BLACK_BRUSH)),
             .lpszClassName = class_name,
         };
-        _ = win.RegisterClassExW(&windowClass);
+        if (win.RegisterClassExW(&windowClass) == 0) return error.RegisterClassExW;
 
         const hwnd = win.CreateWindowExW(
             win.WS_EX_APPWINDOW,
@@ -40,16 +44,18 @@ pub const Window = struct {
             null,
             null,
             null,
-        );
+        ) orelse return error.CreateWindowExW;
 
-        const hdc = win.GetDC(hwnd);
+        const hdc = win.GetDC(hwnd) orelse return error.GetDC;
         const bmi = win.BITMAPINFO{ .bmiHeader = win.BITMAPINFOHEADER{} };
 
         // NOTE(khvorov) to avoid a white flash
         _ = win.ShowWindow(hwnd, win.SW_SHOWMINIMIZED);
         _ = win.ShowWindow(hwnd, win.SW_SHOWNORMAL);
 
-        _ = win.SetWindowLongPtrW(hwnd, win.GWLP_USERDATA, @bitCast(win.LONG_PTR, @ptrToInt(window)));
+        win.SetLastError(.SUCCESS);
+        const set_result = win.SetWindowLongPtrW(hwnd, win.GWLP_USERDATA, @bitCast(win.LONG_PTR, @ptrToInt(window)));
+        if (set_result == 0 and win.GetLastError() != .SUCCESS) return error.SetWindowLongPtrW;
 
         const platform = PlatformWindow{ .hwnd = hwnd, .bmi = bmi, .hdc = hdc };
         window.* = Window{ .is_running = true, .dim = dim, .platform = platform };

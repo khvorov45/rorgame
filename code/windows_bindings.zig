@@ -18,11 +18,11 @@ pub extern "user32" fn CreateWindowExW(
     hMenu: ?HMENU,
     hInstance: ?HINSTANCE,
     lpParam: ?LPVOID,
-) callconv(WINAPI) HWND;
+) callconv(WINAPI) ?HWND;
 
 pub extern "user32" fn RegisterClassExW(unnamedParam1: *const WNDCLASSEXW) callconv(WINAPI) ATOM;
 pub extern "user32" fn DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(WINAPI) LRESULT;
-pub extern "kernel32" fn GetModuleHandleW(lpModuleName: ?LPCWSTR) callconv(WINAPI) HMODULE;
+pub extern "kernel32" fn GetModuleHandleW(lpModuleName: ?LPCWSTR) callconv(WINAPI) ?HMODULE;
 pub extern "user32" fn ShowWindow(hWnd: HWND, nCmdShow: i32) callconv(WINAPI) BOOL;
 pub extern "user32" fn LoadCursorA(hInstance: ?HINSTANCE, lpCursorName: LPCSTR) callconv(WINAPI) HCURSOR;
 pub extern "gdi32" fn GetStockObject(i: i32) callconv(WINAPI) HGDIOBJ;
@@ -33,7 +33,7 @@ pub extern "user32" fn SetWindowLongPtrW(hWnd: HWND, nIndex: i32, dwNewLong: LON
 pub extern "user32" fn GetWindowLongPtrW(hWnd: HWND, nIndex: i32) callconv(WINAPI) LONG_PTR;
 pub extern "user32" fn PeekMessageW(lpMsg: *MSG, hWnd: ?HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) callconv(WINAPI) BOOL;
 pub extern "kernel32" fn VirtualAlloc(lpAddress: ?LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD) callconv(WINAPI) ?LPVOID;
-pub extern "user32" fn GetDC(hWnd: ?HWND) callconv(WINAPI) HDC;
+pub extern "user32" fn GetDC(hWnd: ?HWND) callconv(WINAPI) ?HDC;
 pub extern "kernel32" fn OutputDebugStringA(lpOutputString: LPCSTR) callconv(WINAPI) void;
 pub extern "kernel32" fn ExitProcess(exit_code: UINT) callconv(WINAPI) noreturn;
 pub extern "kernel32" fn GetLastError() callconv(WINAPI) Win32Error;
@@ -62,6 +62,7 @@ pub extern "gdi32" fn StretchDIBits(
     iUsage: UINT,
     rop: DWORD,
 ) callconv(WINAPI) i32;
+pub extern "kernel32" fn SetLastError(dwErrCode: Win32Error) callconv(WINAPI) void;
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;
