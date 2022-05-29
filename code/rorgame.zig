@@ -18,7 +18,9 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace) noreturn {
 }
 
 pub fn main() noreturn {
-    var virtual_arena = mem.VirtualArena.new(1 * mem.GIGABYTE, 1 * mem.MEGABYTE);
+    var virtual_arena = mem.VirtualArena.new(1 * mem.GIGABYTE, 1 * mem.MEGABYTE) catch |err| {
+        std.debug.panic("failed to allocate memory: {}", .{err});
+    };
     const virtual_arena_allocator = virtual_arena.allocator();
 
     var window: wnd.Window = undefined;

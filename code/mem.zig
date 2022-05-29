@@ -40,9 +40,9 @@ pub const VirtualArena = struct {
     committed: usize,
     used: usize,
 
-    pub fn new(comptime reserve: usize, comptime commit: usize) VirtualArena {
+    pub fn new(comptime reserve: usize, comptime commit: usize) !VirtualArena {
         comptime assert(commit <= reserve);
-        const reserve_result = platform.reserve(reserve);
+        const reserve_result = try platform.reserve(reserve);
         const commit_result = platform.commit(reserve_result.ptr, commit);
         var varena = VirtualArena{
             .base = reserve_result.ptr,
