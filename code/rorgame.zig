@@ -1,23 +1,40 @@
+const std = @import("std");
+
+const math = @import("math.zig");
 const wnd = @import("window.zig");
 const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
+const log = @import("log.zig");
+const builtin = @import("builtin");
 
-pub fn main() !void {
-    var virtual_arena: mem.VirtualArena = undefined;
-    virtual_arena.init(1 * mem.GIGABYTE, 1 * mem.MEGABYTE);
+const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
+
+pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace) noreturn {
+    _ = trace;
+    @setCold(true);
+    log.err("{s}", .{msg});
+    @breakpoint();
+    platform.panic_exit();
+}
+
+pub fn main() noreturn {
+    var virtual_arena = mem.VirtualArena.new(1 * mem.GIGABYTE, 1 * mem.MEGABYTE);
     const virtual_arena_allocator = virtual_arena.allocator();
 
     var window: wnd.Window = undefined;
-    window.init(1000, 1000);
+    window.init(math.V2i{ .x = 1280, .y = 720 });
 
-    var renderer: rdr.Renderer = undefined;
-    renderer.init(7680, 4320, virtual_arena_allocator);
+    var renderer = rdr.Renderer.new(window.dim, virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to create renderer: {}", .{err});
+    };
 
     while (window.is_running) {
         window.pollForInput();
 
-        renderer.clearBuffers(window.width, window.height);
+        renderer.clearBuffers();
 
-        window.displayPixels(renderer.pixels, renderer.width, renderer.height);
+        window.displayPixels(renderer.pixels, renderer.dim);
     }
+
+    platform.exit();
 }

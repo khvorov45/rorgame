@@ -1,11 +1,12 @@
-const windows = @import("mem_windows.zig");
 const builtin = @import("builtin");
 const std = @import("std");
 
 const assert = std.debug.assert;
 const panic = std.debug.panic;
 
-pub const platform = if (builtin.os.tag == .windows) windows else @panic("missing mem implementation");
+const log = @import("log.zig");
+
+pub const platform = if (builtin.os.tag == .windows) @import("mem_windows.zig") else @panic("missing mem implementation");
 
 pub const BYTE = 1;
 pub const KILOBYTE = 1024 * BYTE;
@@ -39,12 +40,17 @@ pub const VirtualArena = struct {
     committed: usize,
     used: usize,
 
-    pub fn init(varena: *VirtualArena, reserve: usize, commit: usize) void {
+    pub fn new(reserve: usize, commit: usize) VirtualArena {
         assert(commit <= reserve);
-        varena.reserved = reserve;
-        varena.used = 0;
-        platform.reserve(reserve, &varena.base, &varena.reserved);
-        platform.commit(varena.base, commit, &varena.committed);
+        const reserve_result = platform.reserve(reserve);
+        const commit_result = platform.commit(reserve_result.ptr, commit);
+        var varena = VirtualArena{
+            .base = reserve_result.ptr,
+            .reserved = reserve_result.size_actual,
+            .committed = commit_result,
+            .used = 0,
+        };
+        return varena;
     }
 
     fn alloc(varena: *VirtualArena, size: usize, ptr_align: u29, len_align: u29, ret_addr: usize) ![]u8 {
@@ -64,10 +70,11 @@ pub const VirtualArena = struct {
             result = base_aligned[0..size];
             varena.used += size_aligned;
         } else if (reserved_and_free >= size_aligned) {
-            platform.commit(varena.base, varena.used + size_aligned, &varena.committed);
+            varena.committed = platform.commit(varena.base, varena.used + size_aligned);
             result = base_aligned[0..size];
             varena.used += size_aligned;
         } else {
+            log.err("virtual arena {} out of memory, asked for {} bytes", .{ varena, size_aligned });
             result = error.OutOfMemory;
         }
 

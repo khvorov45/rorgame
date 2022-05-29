@@ -34,6 +34,8 @@ pub extern "user32" fn GetWindowLongPtrW(hWnd: HWND, nIndex: i32) callconv(WINAP
 pub extern "user32" fn PeekMessageW(lpMsg: *MSG, hWnd: ?HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) callconv(WINAPI) BOOL;
 pub extern "kernel32" fn VirtualAlloc(lpAddress: ?LPVOID, dwSize: SIZE_T, flAllocationType: DWORD, flProtect: DWORD) callconv(WINAPI) ?LPVOID;
 pub extern "user32" fn GetDC(hWnd: ?HWND) callconv(WINAPI) HDC;
+pub extern "kernel32" fn OutputDebugStringA(lpOutputString: LPCSTR) callconv(WINAPI) void;
+pub extern "kernel32" fn ExitProcess(exit_code: UINT) callconv(WINAPI) noreturn;
 
 pub extern "gdi32" fn StretchDIBits(
     hdc: HDC,
