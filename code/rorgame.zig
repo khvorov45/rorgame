@@ -1,11 +1,12 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const math = @import("math.zig");
 const wnd = @import("window.zig");
 const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
 const log = @import("log.zig");
-const builtin = @import("builtin");
+const fs = @import("filesystem.zig");
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
@@ -30,6 +31,10 @@ pub fn main() noreturn {
 
     var renderer = rdr.Renderer.new(window.dim, virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to create renderer: {}", .{err});
+    };
+
+    _ = fs.read_entire_file("assets/sGManIdle_0.png", virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to read file: {}", .{err});
     };
 
     while (window.is_running) {

@@ -63,6 +63,30 @@ pub extern "gdi32" fn StretchDIBits(
     rop: DWORD,
 ) callconv(WINAPI) i32;
 pub extern "kernel32" fn SetLastError(dwErrCode: Win32Error) callconv(WINAPI) void;
+pub extern "kernel32" fn ReadFileEx(
+    hFile: HANDLE,
+    lpBuffer: LPVOID,
+    nNumberOfBytesToRead: DWORD,
+    lpOverlapped: LPOVERLAPPED,
+    lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
+) callconv(WINAPI) void;
+pub extern "kernel32" fn ReadFile(
+    hFile: HANDLE,
+    lpBuffer: [*]u8,
+    nNumberOfBytesToRead: DWORD,
+    lpNumberOfBytesRead: ?*DWORD,
+    lpOverlapped: ?*OVERLAPPED,
+) callconv(WINAPI) BOOL;
+pub extern "kernel32" fn CreateFileW(
+    lpFileName: [*:0]const u16,
+    dwDesiredAccess: DWORD,
+    dwShareMode: DWORD,
+    lpSecurityAttributes: ?*SECURITY_ATTRIBUTES,
+    dwCreationDisposition: DWORD,
+    dwFlagsAndAttributes: DWORD,
+    hTemplateFile: ?HANDLE,
+) callconv(WINAPI) HANDLE;
+pub extern "kernel32" fn GetFileSizeEx(hFile: HANDLE, lpFileSize: *LARGE_INTEGER) callconv(WINAPI) BOOL;
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;
@@ -118,6 +142,7 @@ pub const LPARAM = LONG_PTR;
 pub const LRESULT = LONG_PTR;
 
 pub const va_list = *opaque {};
+pub const INVALID_HANDLE_VALUE = @intToPtr(HANDLE, @bitCast(usize, @as(isize, -1)));
 
 pub const TRUE = 1;
 pub const FALSE = 0;
@@ -176,6 +201,11 @@ pub const WS_EX_PALETTEWINDOW = WS_EX_WINDOWEDGE | WS_EX_TOOLWINDOW | WS_EX_TOPM
 pub const CW_USEDEFAULT = @bitCast(i32, @as(u32, 0x80000000));
 
 pub const WNDPROC = fn (hwnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(WINAPI) LRESULT;
+pub const LPOVERLAPPED_COMPLETION_ROUTINE = fn (
+    dwErrorCode: DWORD,
+    dwNumberOfBytesTransfered: DWORD,
+    lpOverlapped: LPOVERLAPPED,
+) callconv(WINAPI) void;
 
 pub const CS_VREDRAW = 0x0001;
 pub const CS_HREDRAW = 0x0002;
@@ -202,6 +232,12 @@ pub const WNDCLASSEXW = extern struct {
     lpszMenuName: ?LPCWSTR = null,
     lpszClassName: LPCWSTR,
     hIconSm: ?HICON = null,
+};
+
+pub const SECURITY_ATTRIBUTES = extern struct {
+    nLength: DWORD,
+    lpSecurityDescriptor: ?*anyopaque,
+    bInheritHandle: BOOL,
 };
 
 pub const SW_HIDE = 0;
@@ -260,6 +296,21 @@ pub const POINT = extern struct {
     x: LONG,
     y: LONG,
 };
+
+pub const OVERLAPPED = extern struct {
+    Internal: ULONG_PTR,
+    InternalHigh: ULONG_PTR,
+    DUMMYUNIONNAME: extern union {
+        DUMMYSTRUCTNAME: extern struct {
+            Offset: DWORD,
+            OffsetHigh: DWORD,
+        },
+        Pointer: ?PVOID,
+    },
+    hEvent: ?HANDLE,
+};
+
+pub const LPOVERLAPPED = *OVERLAPPED;
 
 pub const GWLP_WNDPROC = -4;
 pub const GWLP_HINSTANCE = -6;
@@ -3853,3 +3904,119 @@ pub const FORMAT_MESSAGE_FROM_STRING = 0x00000400;
 pub const FORMAT_MESSAGE_FROM_SYSTEM = 0x00001000;
 pub const FORMAT_MESSAGE_IGNORE_INSERTS = 0x00000200;
 pub const FORMAT_MESSAGE_MAX_WIDTH_MASK = 0x000000FF;
+
+pub const PIPE_ACCESS_INBOUND = 0x00000001;
+pub const PIPE_ACCESS_OUTBOUND = 0x00000002;
+pub const PIPE_ACCESS_DUPLEX = 0x00000003;
+
+pub const PIPE_TYPE_BYTE = 0x00000000;
+pub const PIPE_TYPE_MESSAGE = 0x00000004;
+
+pub const PIPE_READMODE_BYTE = 0x00000000;
+pub const PIPE_READMODE_MESSAGE = 0x00000002;
+
+pub const PIPE_WAIT = 0x00000000;
+pub const PIPE_NOWAIT = 0x00000001;
+
+pub const GENERIC_READ = 0x80000000;
+pub const GENERIC_WRITE = 0x40000000;
+pub const GENERIC_EXECUTE = 0x20000000;
+pub const GENERIC_ALL = 0x10000000;
+
+pub const FILE_SHARE_DELETE = 0x00000004;
+pub const FILE_SHARE_READ = 0x00000001;
+pub const FILE_SHARE_WRITE = 0x00000002;
+
+pub const DELETE = 0x00010000;
+pub const READ_CONTROL = 0x00020000;
+pub const WRITE_DAC = 0x00040000;
+pub const WRITE_OWNER = 0x00080000;
+pub const SYNCHRONIZE = 0x00100000;
+pub const STANDARD_RIGHTS_READ = READ_CONTROL;
+pub const STANDARD_RIGHTS_WRITE = READ_CONTROL;
+pub const STANDARD_RIGHTS_EXECUTE = READ_CONTROL;
+pub const STANDARD_RIGHTS_REQUIRED = DELETE | READ_CONTROL | WRITE_DAC | WRITE_OWNER;
+
+// disposition for NtCreateFile
+pub const FILE_SUPERSEDE = 0;
+pub const FILE_OPEN = 1;
+pub const FILE_CREATE = 2;
+pub const FILE_OPEN_IF = 3;
+pub const FILE_OVERWRITE = 4;
+pub const FILE_OVERWRITE_IF = 5;
+pub const FILE_MAXIMUM_DISPOSITION = 5;
+
+// flags for NtCreateFile and NtOpenFile
+pub const FILE_READ_DATA = 0x00000001;
+pub const FILE_LIST_DIRECTORY = 0x00000001;
+pub const FILE_WRITE_DATA = 0x00000002;
+pub const FILE_ADD_FILE = 0x00000002;
+pub const FILE_APPEND_DATA = 0x00000004;
+pub const FILE_ADD_SUBDIRECTORY = 0x00000004;
+pub const FILE_CREATE_PIPE_INSTANCE = 0x00000004;
+pub const FILE_READ_EA = 0x00000008;
+pub const FILE_WRITE_EA = 0x00000010;
+pub const FILE_EXECUTE = 0x00000020;
+pub const FILE_TRAVERSE = 0x00000020;
+pub const FILE_DELETE_CHILD = 0x00000040;
+pub const FILE_READ_ATTRIBUTES = 0x00000080;
+pub const FILE_WRITE_ATTRIBUTES = 0x00000100;
+
+pub const FILE_DIRECTORY_FILE = 0x00000001;
+pub const FILE_WRITE_THROUGH = 0x00000002;
+pub const FILE_SEQUENTIAL_ONLY = 0x00000004;
+pub const FILE_NO_INTERMEDIATE_BUFFERING = 0x00000008;
+pub const FILE_SYNCHRONOUS_IO_ALERT = 0x00000010;
+pub const FILE_SYNCHRONOUS_IO_NONALERT = 0x00000020;
+pub const FILE_NON_DIRECTORY_FILE = 0x00000040;
+pub const FILE_CREATE_TREE_CONNECTION = 0x00000080;
+pub const FILE_COMPLETE_IF_OPLOCKED = 0x00000100;
+pub const FILE_NO_EA_KNOWLEDGE = 0x00000200;
+pub const FILE_OPEN_FOR_RECOVERY = 0x00000400;
+pub const FILE_RANDOM_ACCESS = 0x00000800;
+pub const FILE_DELETE_ON_CLOSE = 0x00001000;
+pub const FILE_OPEN_BY_FILE_ID = 0x00002000;
+pub const FILE_OPEN_FOR_BACKUP_INTENT = 0x00004000;
+pub const FILE_NO_COMPRESSION = 0x00008000;
+pub const FILE_RESERVE_OPFILTER = 0x00100000;
+pub const FILE_OPEN_REPARSE_POINT = 0x00200000;
+pub const FILE_OPEN_OFFLINE_FILE = 0x00400000;
+pub const FILE_OPEN_FOR_FREE_SPACE_QUERY = 0x00800000;
+
+pub const CREATE_ALWAYS = 2;
+pub const CREATE_NEW = 1;
+pub const OPEN_ALWAYS = 4;
+pub const OPEN_EXISTING = 3;
+pub const TRUNCATE_EXISTING = 5;
+
+pub const FILE_ATTRIBUTE_ARCHIVE = 0x20;
+pub const FILE_ATTRIBUTE_COMPRESSED = 0x800;
+pub const FILE_ATTRIBUTE_DEVICE = 0x40;
+pub const FILE_ATTRIBUTE_DIRECTORY = 0x10;
+pub const FILE_ATTRIBUTE_ENCRYPTED = 0x4000;
+pub const FILE_ATTRIBUTE_HIDDEN = 0x2;
+pub const FILE_ATTRIBUTE_INTEGRITY_STREAM = 0x8000;
+pub const FILE_ATTRIBUTE_NORMAL = 0x80;
+pub const FILE_ATTRIBUTE_NOT_CONTENT_INDEXED = 0x2000;
+pub const FILE_ATTRIBUTE_NO_SCRUB_DATA = 0x20000;
+pub const FILE_ATTRIBUTE_OFFLINE = 0x1000;
+pub const FILE_ATTRIBUTE_READONLY = 0x1;
+pub const FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000;
+pub const FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x40000;
+pub const FILE_ATTRIBUTE_REPARSE_POINT = 0x400;
+pub const FILE_ATTRIBUTE_SPARSE_FILE = 0x200;
+pub const FILE_ATTRIBUTE_SYSTEM = 0x4;
+pub const FILE_ATTRIBUTE_TEMPORARY = 0x100;
+pub const FILE_ATTRIBUTE_VIRTUAL = 0x10000;
+
+// flags for CreateEvent
+pub const CREATE_EVENT_INITIAL_SET = 0x00000002;
+pub const CREATE_EVENT_MANUAL_RESET = 0x00000001;
+
+pub const EVENT_ALL_ACCESS = 0x1F0003;
+pub const EVENT_MODIFY_STATE = 0x0002;
+
+// MEMORY_BASIC_INFORMATION.Type flags for VirtualQuery
+pub const MEM_IMAGE = 0x1000000;
+pub const MEM_MAPPED = 0x40000;
+pub const MEM_PRIVATE = 0x20000;
