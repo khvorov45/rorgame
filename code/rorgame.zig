@@ -33,11 +33,29 @@ pub fn main() noreturn {
     };
 
     while (window.is_running) {
+        //
+        // SECTION Input
+        //
+
         window.pollForInput();
+
+        //
+        // SECTION Update
+        //
+
+        //
+        // SECTION Render
+        //
 
         renderer.clearBuffers();
 
-        window.displayPixels(renderer.pixels, renderer.dim);
+        renderer.drawRect(
+            math.Rect2i{ .topleft = math.V2i{ .x = 50, .y = 50 }, .dim = math.V2i{ .x = 150, .y = 150 } },
+            math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
+            math.Rect2i{ .topleft = math.V2i{ .x = 0, .y = 0 }, .dim = renderer.atlas.dim },
+        );
+
+        window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
     }
 
     platform.exit();
