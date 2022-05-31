@@ -1,38 +1,55 @@
-pub const V2i = struct {
-    x: i32,
-    y: i32,
+fn V2(comptime T: type) type {
+    return struct {
+        x: T,
+        y: T,
 
-    pub fn max(self: V2i, other: V2i) V2i {
-        return V2i{ .x = @maximum(self.x, other.x), .y = @maximum(self.y, other.y) };
-    }
+        pub fn max(self: @This(), other: @This()) @This() {
+            return @This(){ .x = @maximum(self.x, other.x), .y = @maximum(self.y, other.y) };
+        }
 
-    pub fn min(self: V2i, other: V2i) V2i {
-        return V2i{ .x = @minimum(self.x, other.x), .y = @minimum(self.y, other.y) };
-    }
+        pub fn min(self: @This(), other: @This()) @This() {
+            return @This(){ .x = @minimum(self.x, other.x), .y = @minimum(self.y, other.y) };
+        }
 
-    pub fn add(self: V2i, other: V2i) V2i {
-        return V2i{ .x = self.x + other.x, .y = self.y + other.y };
-    }
+        pub fn add(self: @This(), other: @This()) @This() {
+            return @This(){ .x = self.x + other.x, .y = self.y + other.y };
+        }
 
-    pub fn sub(self: V2i, other: V2i) V2i {
-        return V2i{ .x = self.x - other.x, .y = self.y - other.y };
-    }
-};
+        pub fn sub(self: @This(), other: @This()) @This() {
+            return @This(){ .x = self.x - other.x, .y = self.y - other.y };
+        }
 
-pub const Rect2i = struct {
-    topleft: V2i,
-    dim: V2i,
+        pub fn to(self: @This(), comptime Target: type) Target {
+            switch (Target) {
+                V2f => return Target{ .x = @intToFloat(f32, self.x), .y = @intToFloat(f32, self.y) },
+                else => @compileError("wrong conversion"),
+            }
+        }
+    };
+}
 
-    pub fn bottomright(rect: Rect2i) V2i {
-        return rect.topleft.add(rect.dim);
-    }
+pub const V2i = V2(i32);
+pub const V2f = V2(f32);
 
-    pub fn clipToRect(rect: Rect2i, clip: Rect2i) Rect2i {
-        const result_topleft = rect.topleft.max(clip.topleft);
-        const result_bottomright = rect.bottomright().min(clip.bottomright());
-        return Rect2i{ .topleft = result_topleft, .dim = result_bottomright.sub(result_topleft) };
-    }
-};
+fn Rect2(comptime T: type) type {
+    return struct {
+        topleft: T,
+        dim: T,
+
+        pub fn bottomright(rect: @This()) T {
+            return rect.topleft.add(rect.dim);
+        }
+
+        pub fn clipToRect(rect: @This(), clip: @This()) @This() {
+            const result_topleft = rect.topleft.max(clip.topleft);
+            const result_bottomright = rect.bottomright().min(clip.bottomright());
+            return @This(){ .topleft = result_topleft, .dim = result_bottomright.sub(result_topleft) };
+        }
+    };
+}
+
+pub const Rect2i = Rect2(V2i);
+pub const Rect2f = Rect2(V2f);
 
 pub const Color = struct {
     r: f32,
