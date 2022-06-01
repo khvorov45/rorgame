@@ -61,6 +61,10 @@ pub const Color = struct {
         return Color{ .r = color.r * other, .g = color.g * other, .b = color.b * other, .a = color.a * other };
     }
 
+    pub fn add(color: Color, other: Color) Color {
+        return Color{ .r = color.r + other.r, .g = color.g + other.g, .b = color.b + other.b, .a = color.a + other.a };
+    }
+
     pub fn toU32ARGB(color: Color) u32 {
         const color255 = color.mul(255);
         const aU32 = @floatToInt(u32, color255.a) & 0xFF;
@@ -68,6 +72,15 @@ pub const Color = struct {
         const gU32 = @floatToInt(u32, color255.g) & 0xFF;
         const bU32 = @floatToInt(u32, color255.b) & 0xFF;
         const result = (aU32 << 24) | (rU32 << 16) | (gU32 << 8) | bU32;
+        return result;
+    }
+
+    pub fn fromU32ARGB(src: u32) Color {
+        const a = @intToFloat(f32, (src >> 24) & 0xFF) / 255;
+        const r = @intToFloat(f32, (src >> 16) & 0xFF) / 255;
+        const g = @intToFloat(f32, (src >> 8) & 0xFF) / 255;
+        const b = @intToFloat(f32, (src >> 0) & 0xFF) / 255;
+        const result = Color{ .r = r, .g = g, .b = b, .a = a };
         return result;
     }
 };

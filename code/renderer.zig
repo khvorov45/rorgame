@@ -20,7 +20,7 @@ pub const Renderer = struct {
         };
         atl.pixels[0] = 0xFFFF0000;
         atl.pixels[1] = 0xFF0000FF;
-        atl.pixels[2] = 0xFF0FF000;
+        atl.pixels[2] = 0xFF00FF00;
         atl.pixels[3] = 0xFFFF00FF;
 
         return Renderer{ .draw_buffer = draw_buf, .atlas = atl };
@@ -47,12 +47,37 @@ pub const Renderer = struct {
                 if (texture_coords) |coords| {
                     const u = (@intToFloat(f32, col) - rect.topleft.x) / (rect.dim.x - 1);
                     const v = (@intToFloat(f32, row) - rect.topleft.y) / (rect.dim.y - 1);
-                    const tex_col = @floatToInt(i32, u * (coords.dim.x - 1) + (coords.topleft.x) + 0.5);
-                    const tex_row = @floatToInt(i32, v * (coords.dim.y - 1) + (coords.topleft.y) + 0.5);
+                    const tex_colf = u * (coords.dim.x - 1) + (coords.topleft.x);
+                    const tex_rowf = v * (coords.dim.y - 1) + (coords.topleft.y);
 
-                    const tex_index = @intCast(usize, tex_row * renderer.atlas.dim.x + tex_col);
-                    const texel = renderer.atlas.pixels[tex_index];
-                    final_color = texel;
+                    const tex_col_left = @floatToInt(i32, tex_colf);
+                    const tex_col_right = @floatToInt(i32, @minimum(tex_colf + 1, coords.dim.x - 1 + coords.topleft.x));
+                    const tex_col_from_left = tex_colf - @intToFloat(f32, tex_col_left);
+
+                    const tex_row_top = @floatToInt(i32, tex_rowf);
+                    const tex_row_bottom = @floatToInt(i32, @minimum(tex_rowf + 1, coords.dim.y - 1 + coords.topleft.y));
+                    const tex_row_from_top = tex_rowf - @intToFloat(f32, tex_row_top);
+
+                    const tex_index_topleft = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_left);
+                    const tex_index_topright = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_right);
+                    const tex_index_bottomleft = @intCast(usize, tex_row_bottom * renderer.atlas.dim.x + tex_col_left);
+                    const tex_index_bottomright = @intCast(usize, tex_row_bottom * renderer.atlas.dim.x + tex_col_right);
+
+                    const texel_topleft_u32 = renderer.atlas.pixels[tex_index_topleft];
+                    const texel_topright_u32 = renderer.atlas.pixels[tex_index_topright];
+                    const texel_bottomleft_u32 = renderer.atlas.pixels[tex_index_bottomleft];
+                    const texel_bottomright_u32 = renderer.atlas.pixels[tex_index_bottomright];
+
+                    const texel_topleft = math.Color.fromU32ARGB(texel_topleft_u32);
+                    const texel_topright = math.Color.fromU32ARGB(texel_topright_u32);
+                    const texel_bottomleft = math.Color.fromU32ARGB(texel_bottomleft_u32);
+                    const texel_bottomright = math.Color.fromU32ARGB(texel_bottomright_u32);
+
+                    const blend_top = texel_topleft.mul(1 - tex_col_from_left).add(texel_topright.mul(tex_col_from_left));
+                    const blend_bottom = texel_bottomleft.mul(1 - tex_col_from_left).add(texel_bottomright.mul(tex_col_from_left));
+                    const blend = blend_top.mul(1 - tex_row_from_top).add(blend_bottom.mul(tex_row_from_top));
+
+                    final_color = blend.toU32ARGB();
                 }
 
                 const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
