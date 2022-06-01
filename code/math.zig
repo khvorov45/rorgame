@@ -19,6 +19,18 @@ fn V2(comptime T: type) type {
             return @This(){ .x = self.x - other.x, .y = self.y - other.y };
         }
 
+        pub fn floor(self: @This()) @This() {
+            return @This(){ .x = @floor(self.x), .y = @floor(self.y) };
+        }
+
+        pub fn ceil(self: @This()) @This() {
+            return @This(){ .x = @ceil(self.x), .y = @ceil(self.y) };
+        }
+
+        pub fn round(self: @This()) @This() {
+            return @This(){ .x = @round(self.x), .y = @round(self.y) };
+        }
+
         pub fn to(self: @This(), comptime Target: type) Target {
             switch (Target) {
                 V2f => return Target{ .x = @intToFloat(f32, self.x), .y = @intToFloat(f32, self.y) },
