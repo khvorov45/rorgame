@@ -37,7 +37,8 @@ pub fn main() noreturn {
         std.debug.panic("failed to read file: {}", .{err});
     };
 
-    var rect_topleft_x: f32 = 50;
+    var rect_topleft_x: f32 = 0;
+    var rect_topleft_y: f32 = 0;
 
     while (window.is_running) {
         //
@@ -51,6 +52,7 @@ pub fn main() noreturn {
         //
 
         rect_topleft_x += 0.01;
+        rect_topleft_y += 0.005;
 
         //
         // SECTION Render
@@ -59,9 +61,9 @@ pub fn main() noreturn {
         renderer.clearBuffers();
 
         renderer.drawRect(
-            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = 50 }, .dim = math.V2f{ .x = 400, .y = 400 } },
+            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = math.V2f{ .x = 200, .y = 200 } },
             math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
-            math.Rect2f{ .topleft = math.V2f{ .x = 0, .y = 0 }, .dim = renderer.atlas.dim.to(math.V2f) },
+            math.Rect2f{ .topleft = math.V2f{ .x = 1, .y = 1 }, .dim = math.V2f{ .x = 2, .y = 2 } },
         );
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);

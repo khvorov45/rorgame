@@ -13,17 +13,31 @@ pub const Renderer = struct {
             .dim = dim,
         };
 
-        const atlas_dim = math.V2i{ .x = 2, .y = 2 };
-        const atl = Texture{
-            .pixels = try allocator.alloc(u32, @intCast(usize, atlas_dim.x * atlas_dim.y)),
-            .dim = atlas_dim,
-        };
-        atl.pixels[0] = 0xFFFF0000;
-        atl.pixels[1] = 0xFF0000FF;
-        atl.pixels[2] = 0xFF00FF00;
-        atl.pixels[3] = 0xFFFF00FF;
+        const atlas_dim = math.V2i{ .x = 4, .y = 4 };
+        const atlas_pixels = try allocator.alloc(u32, @intCast(usize, atlas_dim.x * atlas_dim.y));
 
-        return Renderer{ .draw_buffer = draw_buf, .atlas = atl };
+        atlas_pixels[0] = 0;
+        atlas_pixels[1] = 0;
+        atlas_pixels[2] = 0;
+        atlas_pixels[3] = 0;
+
+        atlas_pixels[4] = 0;
+        atlas_pixels[5] = 0xFFFF0000;
+        atlas_pixels[6] = 0xFF00FF00;
+        atlas_pixels[7] = 0;
+
+        atlas_pixels[8] = 0;
+        atlas_pixels[9] = 0xFF0000FF;
+        atlas_pixels[10] = 0xFFFF00FF;
+        atlas_pixels[11] = 0;
+
+        atlas_pixels[12] = 0;
+        atlas_pixels[13] = 0;
+        atlas_pixels[14] = 0;
+        atlas_pixels[15] = 0;
+
+        const atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim };
+        return Renderer{ .draw_buffer = draw_buf, .atlas = atlas };
     }
 
     pub fn clearBuffers(renderer: *Renderer) void {
@@ -38,10 +52,8 @@ pub const Renderer = struct {
         const rect_clipped = rect.clipToRect(math.Rect2f{ .topleft = math.V2f{ .x = 0, .y = 0 }, .dim = renderer.draw_buffer.dim.to(math.V2f) });
         const bottomright = rect_clipped.bottomright();
 
-        const topleft_aligned = rect_clipped.topleft.round();
-        const bottomright_aligned = bottomright.round();
-
-        const misalign = rect_clipped.topleft.add(math.V2f{ .x = 1.0, .y = 1.0 }).floor().sub(rect_clipped.topleft);
+        const topleft_aligned = rect_clipped.topleft.floor();
+        const bottomright_aligned = bottomright.ceil();
 
         var row = @floatToInt(i32, topleft_aligned.y);
         while (row < @floatToInt(i32, bottomright_aligned.y)) : (row += 1) {
@@ -50,16 +62,23 @@ pub const Renderer = struct {
                 var final_color = color32;
 
                 if (texture_coords) |coords| {
-                    const u = (@intToFloat(f32, col) + 0.5 - rect.topleft.x) / rect.dim.x;
-                    const v = (@intToFloat(f32, row) + 0.5 - rect.topleft.y) / rect.dim.y;
-                    const tex_colf = u * coords.dim.x + coords.topleft.x - 0.5;
-                    const tex_rowf = v * coords.dim.y + coords.topleft.y - 0.5;
+                    const u_left = (@intToFloat(f32, col) - rect.topleft.x) / rect.dim.x;
+                    const v_top = (@intToFloat(f32, row) - rect.topleft.y) / rect.dim.y;
 
-                    const tex_col_left = @floatToInt(i32, tex_colf);
-                    const tex_col_right = @floatToInt(i32, @minimum(tex_colf + 1, coords.dim.x - 1 + coords.topleft.x));
+                    const u_right = (@intToFloat(f32, col + 1) - rect.topleft.x) / rect.dim.x;
+                    const v_bottom = (@intToFloat(f32, row + 1) - rect.topleft.y) / rect.dim.y;
 
-                    const tex_row_top = @floatToInt(i32, tex_rowf);
-                    const tex_row_bottom = @floatToInt(i32, @minimum(tex_rowf + 1, coords.dim.y - 1 + coords.topleft.y));
+                    const tex_colf_left = u_left * coords.dim.x + coords.topleft.x;
+                    const tex_rowf_top = v_top * coords.dim.y + coords.topleft.y;
+
+                    const tex_colf_right = u_right * coords.dim.x + coords.topleft.x;
+                    const tex_rowf_bottom = v_bottom * coords.dim.y + coords.topleft.y;
+
+                    const tex_col_left = @floatToInt(i32, tex_colf_left);
+                    const tex_row_top = @floatToInt(i32, tex_rowf_top);
+
+                    const tex_col_right = @floatToInt(i32, tex_colf_right);
+                    const tex_row_bottom = @floatToInt(i32, tex_rowf_bottom);
 
                     const tex_index_topleft = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_left);
                     const tex_index_topright = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_right);
@@ -76,36 +95,12 @@ pub const Renderer = struct {
                     const texel_bottomleft = math.Color.fromU32ARGB(texel_bottomleft_u32);
                     const texel_bottomright = math.Color.fromU32ARGB(texel_bottomright_u32);
 
-                    //
-                    //
-                    //
+                    const px_on_left = (@floor(tex_colf_left + 1) - tex_colf_left) / (tex_colf_right - tex_colf_left);
+                    const px_on_top = (@floor(tex_rowf_top + 1) - tex_rowf_top) / (tex_rowf_bottom - tex_rowf_top);
 
-                    const col_nearest = @floatToInt(i32, u * (coords.dim.x - 1) + 0.5);
-                    const row_nearest = @floatToInt(i32, v * (coords.dim.x - 1) + 0.5);
-
-                    const next_u = @minimum((@intToFloat(f32, col + 1) - rect.topleft.x) / (rect.dim.x - 1), 1);
-                    const next_v = @minimum((@intToFloat(f32, row + 1) - rect.topleft.y) / (rect.dim.y - 1), 1);
-
-                    const next_col_nearest = @floatToInt(i32, next_u * (coords.dim.x - 1) + 0.5);
-                    const next_row_nearest = @floatToInt(i32, next_v * (coords.dim.x - 1) + 0.5);
-
-                    var blend_top = texel_topleft;
-                    var blend_bottom = texel_bottomleft;
-
-                    if (next_col_nearest != col_nearest) {
-                        blend_top = texel_topleft.mul(misalign.x).add(texel_topright.mul(1 - misalign.x));
-                        blend_bottom = texel_bottomleft.mul(misalign.x).add(texel_bottomright.mul(1 - misalign.x));
-                    } else if (col_nearest == tex_col_right) {
-                        blend_top = texel_topright;
-                        blend_bottom = texel_bottomright;
-                    }
-
-                    var blend = blend_top;
-                    if (next_row_nearest != row_nearest) {
-                        blend = blend_top.mul(misalign.y).add(blend_bottom.mul(1 - misalign.y));
-                    } else if (row_nearest == tex_row_bottom) {
-                        blend = blend_bottom;
-                    }
+                    const blend_top = texel_topleft.mul(px_on_left).add(texel_topright.mul(1 - px_on_left));
+                    const blend_bottom = texel_bottomleft.mul(px_on_left).add(texel_bottomright.mul(1 - px_on_left));
+                    const blend = blend_top.mul(px_on_top).add(blend_bottom.mul(1 - px_on_top));
 
                     final_color = blend.toU32ARGB();
                 }
