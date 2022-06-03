@@ -1,5 +1,5 @@
 zig-cache
 zig-out
-assets
+/assets*
 *rdbg
 *.bat
