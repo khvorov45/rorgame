@@ -1,11 +1,12 @@
 const assert = @import("std").debug.assert;
-const mem = @import("mem.zig");
-const win = @import("windows_bindings.zig");
-const output_windows_error = @import("log_windows.zig").output_windows_error;
-const log = @import("log.zig");
 
-pub fn read_entire_file(comptime filename: []const u8, allocator: mem.Allocator) ![]u8 {
-    errdefer output_windows_error();
+const win = @import("windows_bindings.zig");
+const mem = @import("mem.zig");
+const log = @import("log.zig");
+const outputWindowsError = @import("log_windows.zig").outputWindowsError;
+
+pub fn readEntireFile(comptime filename: []const u8, allocator: mem.Allocator) ![]u8 {
+    errdefer outputWindowsError();
 
     const handle = win.CreateFileW(
         win.L(filename),

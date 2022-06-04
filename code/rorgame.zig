@@ -7,7 +7,7 @@ const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
 const log = @import("log.zig");
 const fs = @import("filesystem.zig");
-const ase = @import("ase.zig");
+const assets = @import("assets.zig");
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
@@ -34,13 +34,7 @@ pub fn main() noreturn {
         std.debug.panic("failed to create renderer: {}", .{err});
     };
 
-    const commando_ase = fs.read_entire_file("assets/commando.ase", virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to read file: {}", .{err});
-    };
-
-    _ = ase.parse(commando_ase) catch |err| {
-        std.debug.panic("failed to parse ase: {}", .{err});
-    };
+    assets.pack(virtual_arena_allocator);
 
     var rect_topleft_x: f32 = 0;
     var rect_topleft_y: f32 = 0;

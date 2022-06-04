@@ -1,7 +1,7 @@
 const math = @import("math.zig");
 const log = @import("log.zig");
 const win = @import("windows_bindings.zig");
-const output_windows_error = @import("log_windows.zig").output_windows_error;
+const outputWindowsError = @import("log_windows.zig").outputWindowsError;
 
 pub const PlatformWindow = struct {
     hwnd: win.HWND,
@@ -15,7 +15,7 @@ pub const Window = struct {
     platform: PlatformWindow,
 
     pub fn init(window: *Window, dim: math.V2i) !void {
-        errdefer output_windows_error();
+        errdefer outputWindowsError();
 
         const class_name = win.L("rorgameClass");
         const module = win.GetModuleHandleW(null) orelse return error.GetModuleHandleW;

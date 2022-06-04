@@ -1,7 +1,7 @@
 const assert = @import("std").debug.assert;
 const log = @import("log.zig");
 const win = @import("windows_bindings.zig");
-const output_windows_error = @import("log_windows.zig").output_windows_error;
+const outputWindowsError = @import("log_windows.zig").outputWindowsError;
 
 pub const ReserveResult = struct {
     ptr: [*]u8,
@@ -11,7 +11,7 @@ pub const ReserveResult = struct {
 pub fn reserve(size: usize) !ReserveResult {
     const ptr = win.VirtualAlloc(null, @intCast(usize, size), win.MEM_RESERVE, win.PAGE_READWRITE);
     if (ptr == null) {
-        output_windows_error();
+        outputWindowsError();
         log.err(
             "VirtualAlloc failed to reserve {} bytes ({} KB {} MB {} GB)",
             .{ size, size / 1024, size / 1024 / 1024, size / 1024 / 1024 / 1024 },
@@ -25,7 +25,7 @@ pub fn reserve(size: usize) !ReserveResult {
 pub fn commit(ptr: [*]u8, size: usize) !usize {
     const base = win.VirtualAlloc(ptr, @intCast(usize, size), win.MEM_COMMIT, win.PAGE_READWRITE);
     if (base == null) {
-        output_windows_error();
+        outputWindowsError();
         log.err(
             "VirtualAlloc failed to commit {} bytes ({} KB {} MB {} GB)",
             .{ size, size / 1024, size / 1024 / 1024, size / 1024 / 1024 / 1024 },

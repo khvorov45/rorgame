@@ -2,11 +2,11 @@ const std = @import("std");
 const win = @import("windows_bindings.zig");
 const err = @import("log.zig").err;
 
-pub fn output_debug_string(msg: [:0]u8) void {
+pub fn outputDebugString(msg: [:0]u8) void {
     win.OutputDebugStringA(msg);
 }
 
-pub fn output_windows_error() void {
+pub fn outputWindowsError() void {
     const err_code = win.GetLastError();
     // 614 is the length of the longest windows error desciption
     var buf_wstr: [614]win.WCHAR = undefined;
