@@ -15,6 +15,8 @@ pub const Texture = struct {
 pub fn pack(allocator: mem.Allocator) !void {
     const commando_ase = try fs.readEntireFile("assets/commando.ase", allocator);
     _ = try ase.parse(commando_ase);
+
+    try fs.writeEntireFileToExeDir("data.rorgame");
 }
 
 pub fn unpack(allocator: mem.Allocator) !Texture {

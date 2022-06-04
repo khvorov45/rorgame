@@ -87,6 +87,14 @@ pub extern "kernel32" fn CreateFileW(
     hTemplateFile: ?HANDLE,
 ) callconv(WINAPI) HANDLE;
 pub extern "kernel32" fn GetFileSizeEx(hFile: HANDLE, lpFileSize: *LARGE_INTEGER) callconv(WINAPI) BOOL;
+pub extern "kernel32" fn GetModuleFileNameW(hModule: ?HMODULE, lpFilename: LPWSTR, nSize: DWORD) callconv(WINAPI) DWORD;
+pub extern "kernel32" fn WriteFile(
+    in_hFile: HANDLE,
+    in_lpBuffer: LPCVOID,
+    in_nNumberOfBytesToWrite: DWORD,
+    out_lpNumberOfBytesWritten: ?*DWORD,
+    in_out_lpOverlapped: ?*OVERLAPPED,
+) callconv(WINAPI) BOOL;
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;
