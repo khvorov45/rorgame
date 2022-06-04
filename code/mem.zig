@@ -39,6 +39,7 @@ pub const VirtualArena = struct {
     reserved: usize,
     committed: usize,
     used: usize,
+    temp_count: i32,
 
     pub fn new(comptime reserve: usize, comptime commit: usize) !VirtualArena {
         comptime assert(commit <= reserve);
@@ -49,6 +50,7 @@ pub const VirtualArena = struct {
             .reserved = reserve_result.size_actual,
             .committed = commit_result,
             .used = 0,
+            .temp_count = 0,
         };
         return varena;
     }
@@ -99,5 +101,21 @@ pub const VirtualArena = struct {
 
     pub fn allocator(varena: *VirtualArena) std.mem.Allocator {
         return Allocator.init(varena, alloc, resize, free);
+    }
+
+    pub fn tempBegin(varena: *VirtualArena) VirtualArenaTemp {
+        varena.temp_count += 1;
+        return VirtualArenaTemp{ .used = varena.used, .varena = varena };
+    }
+};
+
+pub const VirtualArenaTemp = struct {
+    used: usize,
+    varena: *VirtualArena,
+
+    pub fn end(temp: VirtualArenaTemp) void {
+        assert(temp.varena.temp_count > 0);
+        temp.varena.temp_count -= 1;
+        temp.varena.used = temp.used;
     }
 };

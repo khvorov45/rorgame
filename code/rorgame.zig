@@ -30,9 +30,11 @@ pub fn main() noreturn {
         std.debug.panic("failed to init window: {}", .{err});
     };
 
+    const temp_memory = virtual_arena.tempBegin();
     assets.pack(virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to pack assets: {}", .{err});
     };
+    temp_memory.end();
 
     const atlas = assets.unpack(virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to unpack assets: {}", .{err});
@@ -46,6 +48,8 @@ pub fn main() noreturn {
     var rect_topleft_y: f32 = 0;
 
     while (window.is_running) {
+        std.debug.assert(virtual_arena.temp_count == 0);
+
         //
         // SECTION Input
         //
