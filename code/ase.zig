@@ -5,6 +5,7 @@ const log = @import("log.zig");
 const math = @import("math.zig");
 const zlib = @import("zlib.zig");
 const mem = @import("mem.zig");
+const byteio = @import("byteio.zig");
 
 const Texture = @import("assets.zig").Texture;
 
@@ -63,46 +64,46 @@ const Header = struct {
 
 fn parseHeader(buffer: *[]u8) !Header {
     const init_buffer_size = buffer.*.len;
-    const file_size = readDWORDle(buffer);
+    const file_size = byteio.readU32le(buffer);
     if (file_size != init_buffer_size) return error.FileSizeMismatch;
 
-    const magic = readWORDle(buffer);
+    const magic = byteio.readU16le(buffer);
     if (magic != 0xA5E0) return error.WrongMagic;
 
-    const frame_count = readWORDle(buffer);
+    const frame_count = byteio.readU16le(buffer);
 
-    const width = readWORDle(buffer);
-    const height = readWORDle(buffer);
+    const width = byteio.readU16le(buffer);
+    const height = byteio.readU16le(buffer);
 
-    const bits_per_pixel = readWORDle(buffer);
+    const bits_per_pixel = byteio.readU16le(buffer);
     if (bits_per_pixel != 32 and bits_per_pixel != 16 and bits_per_pixel != 8) return error.WrongBitsPerPx;
 
-    const flags = readDWORDle(buffer);
+    const flags = byteio.readU32le(buffer);
     _ = flags;
 
-    const depricated_speed = readWORDle(buffer);
+    const depricated_speed = byteio.readU16le(buffer);
     _ = depricated_speed;
 
-    _ = readDWORDle(buffer);
-    _ = readDWORDle(buffer);
+    _ = byteio.readU32le(buffer);
+    _ = byteio.readU32le(buffer);
 
-    const transparent_color_pallete_entry = readBYTE(buffer);
+    const transparent_color_pallete_entry = byteio.readU8(buffer);
     _ = transparent_color_pallete_entry;
 
-    _ = readBYTE(buffer);
-    _ = readBYTE(buffer);
-    _ = readBYTE(buffer);
+    _ = byteio.readU8(buffer);
+    _ = byteio.readU8(buffer);
+    _ = byteio.readU8(buffer);
 
-    const color_count = readWORDle(buffer);
+    const color_count = byteio.readU16le(buffer);
 
-    const pixel_width = readBYTE(buffer);
-    const pixel_height = readBYTE(buffer);
+    const pixel_width = byteio.readU8(buffer);
+    const pixel_height = byteio.readU8(buffer);
     if (pixel_width != 0 and pixel_height != 0 and pixel_width != pixel_height) return error.NonSquarePixels;
 
-    const grid_x = readSHORTle(buffer);
-    const grid_y = readSHORTle(buffer);
-    const grid_width = readWORDle(buffer);
-    const grid_height = readWORDle(buffer);
+    const grid_x = byteio.readI16le(buffer);
+    const grid_y = byteio.readI16le(buffer);
+    const grid_width = byteio.readU16le(buffer);
+    const grid_height = byteio.readU16le(buffer);
 
     _ = grid_x;
     _ = grid_y;
@@ -127,18 +128,18 @@ const FrameHeader = struct {
 };
 
 fn parseFrameHeader(buffer: *[]u8) !FrameHeader {
-    const frame_size = readDWORDle(buffer);
+    const frame_size = byteio.readU32le(buffer);
 
-    const magic = readWORDle(buffer);
+    const magic = byteio.readU16le(buffer);
     if (magic != 0xF1FA) return error.WrongFrameMagic;
 
-    const old_chunk_count = readWORDle(buffer);
-    const frame_ms = readWORDle(buffer);
+    const old_chunk_count = byteio.readU16le(buffer);
+    const frame_ms = byteio.readU16le(buffer);
 
-    _ = readBYTE(buffer);
-    _ = readBYTE(buffer);
+    _ = byteio.readU8(buffer);
+    _ = byteio.readU8(buffer);
 
-    const new_chunk_count = readDWORDle(buffer);
+    const new_chunk_count = byteio.readU32le(buffer);
     const chunk_count = @maximum(old_chunk_count, new_chunk_count);
 
     const result = FrameHeader{
@@ -173,10 +174,10 @@ const Cel = struct {
 };
 
 fn parseChunk(buffer: *[]u8, bits_per_pixel: i32, allocator: mem.Allocator) !Chunk {
-    const chunk_size = readDWORDle(buffer);
-    const chunk_type = readWORDle(buffer);
+    const chunk_size = byteio.readU32le(buffer);
+    const chunk_type = byteio.readU16le(buffer);
 
-    const chunk_data_size = chunk_size - @sizeOf(DWORD) - @sizeOf(WORD);
+    const chunk_data_size = chunk_size - @sizeOf(u32) - @sizeOf(u16);
     const chunk_data = buffer.*[0..chunk_data_size];
     buffer.* = buffer.*[chunk_data_size..];
 
@@ -206,17 +207,17 @@ fn parseChunk(buffer: *[]u8, bits_per_pixel: i32, allocator: mem.Allocator) !Chu
 fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator) !Cel {
     var chunk_data = chunk_data_init;
 
-    const layer_index = readWORDle(&chunk_data);
+    const layer_index = byteio.readU16le(&chunk_data);
     _ = layer_index;
 
-    const x_pos = readSHORTle(&chunk_data);
-    const y_pos = readSHORTle(&chunk_data);
+    const x_pos = byteio.readI16le(&chunk_data);
+    const y_pos = byteio.readI16le(&chunk_data);
     const pos = math.V2i{ .x = @intCast(i32, x_pos), .y = @intCast(i32, y_pos) };
 
-    const opacity = readBYTE(&chunk_data);
+    const opacity = byteio.readU8(&chunk_data);
     _ = opacity;
 
-    const cel_type = readWORDle(&chunk_data);
+    const cel_type = byteio.readU16le(&chunk_data);
 
     chunk_data = chunk_data[7..];
 
@@ -225,8 +226,8 @@ fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator
         0 => return error.CelTypeRawImageData,
         1 => return error.CelTypeLinked,
         2 => {
-            dim.x = @intCast(i32, readWORDle(&chunk_data));
-            dim.y = @intCast(i32, readWORDle(&chunk_data));
+            dim.x = @intCast(i32, byteio.readU16le(&chunk_data));
+            dim.y = @intCast(i32, byteio.readU16le(&chunk_data));
         },
         3 => return error.CelTypeCompressedTilemap,
         else => return error.CelTypeUnrecognized,
@@ -240,46 +241,5 @@ fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator
         .dim = dim,
         .decompressed = decompressed,
     };
-    return result;
-}
-
-const DWORD = u32;
-const WORD = u16;
-const BYTE = u8;
-const SHORT = i16;
-
-fn readDWORDle(buffer: *[]u8) DWORD {
-    const bytes = buffer.*[0..4];
-    buffer.* = buffer.*[4..];
-
-    const result =
-        (@intCast(DWORD, bytes[3]) << 24) |
-        (@intCast(DWORD, bytes[2]) << 16) |
-        (@intCast(DWORD, bytes[1]) << 8) |
-        (@intCast(DWORD, bytes[0]));
-
-    return result;
-}
-
-fn readWORDle(buffer: *[]u8) DWORD {
-    const bytes = buffer.*[0..2];
-    buffer.* = buffer.*[2..];
-
-    const result =
-        (@intCast(DWORD, bytes[1]) << 8) |
-        (@intCast(DWORD, bytes[0]));
-
-    return result;
-}
-
-fn readBYTE(buffer: *[]u8) BYTE {
-    const byte = buffer.*[0];
-    buffer.* = buffer.*[1..];
-    return byte;
-}
-
-fn readSHORTle(buffer: *[]u8) SHORT {
-    const word = readWORDle(buffer);
-    const result = @intCast(SHORT, word);
     return result;
 }
