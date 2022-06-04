@@ -2,11 +2,19 @@ const std = @import("std");
 const assert = std.debug.assert;
 
 const log = @import("log.zig");
+const math = @import("math.zig");
+const zlib = @import("zlib.zig");
+const mem = @import("mem.zig");
 
-pub fn parse(buffer_init: []u8) !void {
+const Texture = @import("assets.zig").Texture;
+
+pub fn parse(buffer_init: []u8, allocator: mem.Allocator) !Texture {
     var buffer = buffer_init;
     const header = try parseHeader(&buffer);
-    log.debug("{}", .{header});
+    const pixels = try allocator.alloc(u32, @intCast(usize, header.dim.x * header.dim.y));
+    for (pixels) |*px| {
+        px.* = 0;
+    }
 
     var frame_index: i32 = 0;
     while (frame_index < header.frame_count) : (frame_index += 1) {
@@ -15,18 +23,40 @@ pub fn parse(buffer_init: []u8) !void {
 
         var chunk_index: i32 = 0;
         while (chunk_index < frame_header.chunk_count) : (chunk_index += 1) {
-            const chunk = parseChunk(&buffer);
+            const chunk = parseChunk(&buffer, header.bits_per_pixel, allocator);
             log.debug("{}", .{chunk});
         }
     }
 
     if (buffer.len != 0) return error.DidNotParseEntireBuffer;
+
+    pixels[0] = 0;
+    pixels[1] = 0;
+    pixels[2] = 0;
+    pixels[3] = 0;
+
+    pixels[@intCast(usize, header.dim.x) + 0] = 0;
+    pixels[@intCast(usize, header.dim.x) + 1] = 0xFFFF0000;
+    pixels[@intCast(usize, header.dim.x) + 2] = 0xFF00FF00;
+    pixels[@intCast(usize, header.dim.x) + 3] = 0;
+
+    pixels[@intCast(usize, header.dim.x) * 2 + 0] = 0;
+    pixels[@intCast(usize, header.dim.x) * 2 + 1] = 0xFF0000FF;
+    pixels[@intCast(usize, header.dim.x) * 2 + 2] = 0xFFFF00FF;
+    pixels[@intCast(usize, header.dim.x) * 2 + 3] = 0;
+
+    pixels[@intCast(usize, header.dim.x) * 3 + 0] = 0;
+    pixels[@intCast(usize, header.dim.x) * 3 + 1] = 0;
+    pixels[@intCast(usize, header.dim.x) * 3 + 2] = 0;
+    pixels[@intCast(usize, header.dim.x) * 3 + 3] = 0;
+
+    const texture = Texture{ .pixels = pixels, .dim = header.dim };
+    return texture;
 }
 
 const Header = struct {
     frame_count: i32,
-    width: i32,
-    height: i32,
+    dim: math.V2i,
     bits_per_pixel: i32,
     color_count: i32,
 };
@@ -83,8 +113,7 @@ fn parseHeader(buffer: *[]u8) !Header {
 
     const result = Header{
         .frame_count = @intCast(i32, frame_count),
-        .width = @intCast(i32, width),
-        .height = @intCast(i32, height),
+        .dim = math.V2i{ .x = @intCast(i32, width), .y = @intCast(i32, height) },
         .bits_per_pixel = @intCast(i32, bits_per_pixel),
         .color_count = @intCast(i32, color_count),
     };
@@ -120,24 +149,7 @@ fn parseFrameHeader(buffer: *[]u8) !FrameHeader {
     return result;
 }
 
-const ChunkType = enum {
-    old_pallette1,
-    old_pallette2,
-    layer,
-    cel,
-    cel_extra,
-    color_profile,
-    external_files,
-    mask,
-    path,
-    tags,
-    palette,
-    user_data,
-    slice,
-    tileset,
-};
-
-const Chunk = union(ChunkType) {
+const Chunk = union(enum) {
     old_pallette1: void,
     old_pallette2: void,
     layer: void,
@@ -155,13 +167,12 @@ const Chunk = union(ChunkType) {
 };
 
 const Cel = struct {
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
+    pos: math.V2i,
+    dim: math.V2i,
+    decompressed: []u8,
 };
 
-fn parseChunk(buffer: *[]u8) !Chunk {
+fn parseChunk(buffer: *[]u8, bits_per_pixel: i32, allocator: mem.Allocator) !Chunk {
     const chunk_size = readDWORDle(buffer);
     const chunk_type = readWORDle(buffer);
 
@@ -175,7 +186,7 @@ fn parseChunk(buffer: *[]u8) !Chunk {
         0x0004 => Chunk{ .old_pallette1 = {} },
         0x0011 => Chunk{ .old_pallette2 = {} },
         0x2004 => Chunk{ .layer = {} },
-        0x2005 => Chunk{ .cel = try parseCel(chunk_data) },
+        0x2005 => Chunk{ .cel = try parseCel(chunk_data, bits_per_pixel, allocator) },
         0x2006 => Chunk{ .cel_extra = {} },
         0x2007 => Chunk{ .color_profile = {} },
         0x2008 => Chunk{ .external_files = {} },
@@ -192,7 +203,7 @@ fn parseChunk(buffer: *[]u8) !Chunk {
     return chunk;
 }
 
-fn parseCel(chunk_data_init: []u8) !Cel {
+fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator) !Cel {
     var chunk_data = chunk_data_init;
 
     const layer_index = readWORDle(&chunk_data);
@@ -200,6 +211,7 @@ fn parseCel(chunk_data_init: []u8) !Cel {
 
     const x_pos = readSHORTle(&chunk_data);
     const y_pos = readSHORTle(&chunk_data);
+    const pos = math.V2i{ .x = @intCast(i32, x_pos), .y = @intCast(i32, y_pos) };
 
     const opacity = readBYTE(&chunk_data);
     _ = opacity;
@@ -208,24 +220,25 @@ fn parseCel(chunk_data_init: []u8) !Cel {
 
     chunk_data = chunk_data[7..];
 
-    var width: DWORD = undefined;
-    var height: DWORD = undefined;
+    var dim: math.V2i = undefined;
     switch (cel_type) {
         0 => return error.CelTypeRawImageData,
         1 => return error.CelTypeLinked,
         2 => {
-            width = readWORDle(&chunk_data);
-            height = readWORDle(&chunk_data);
+            dim.x = @intCast(i32, readWORDle(&chunk_data));
+            dim.y = @intCast(i32, readWORDle(&chunk_data));
         },
         3 => return error.CelTypeCompressedTilemap,
         else => return error.CelTypeUnrecognized,
     }
 
+    var decompressed = try allocator.alloc(u8, @intCast(usize, dim.x * dim.y * @divExact(bits_per_pixel, 8)));
+    try zlib.decompress(chunk_data, decompressed);
+
     const result = Cel{
-        .x = @intCast(i32, x_pos),
-        .y = @intCast(i32, y_pos),
-        .width = @intCast(i32, width),
-        .height = @intCast(i32, height),
+        .pos = pos,
+        .dim = dim,
+        .decompressed = decompressed,
     };
     return result;
 }

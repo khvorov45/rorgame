@@ -7,7 +7,7 @@ const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
 const log = @import("log.zig");
 const fs = @import("filesystem.zig");
-const assets = @import("assets.zig");
+const Assets = @import("assets.zig").Assets;
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
@@ -30,17 +30,11 @@ pub fn main() noreturn {
         std.debug.panic("failed to init window: {}", .{err});
     };
 
-    const temp_memory = virtual_arena.tempBegin();
-    assets.pack(virtual_arena_allocator) catch |err| {
+    const assets = Assets.fromSources(virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to pack assets: {}", .{err});
     };
-    temp_memory.end();
 
-    const atlas = assets.unpack(virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to unpack assets: {}", .{err});
-    };
-
-    var renderer = rdr.Renderer.new(window.dim, atlas, virtual_arena_allocator) catch |err| {
+    var renderer = rdr.Renderer.new(window.dim, assets.atlas, virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to create renderer: {}", .{err});
     };
 
