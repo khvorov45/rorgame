@@ -30,11 +30,17 @@ pub fn main() noreturn {
         std.debug.panic("failed to init window: {}", .{err});
     };
 
-    var renderer = rdr.Renderer.new(window.dim, virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to create renderer: {}", .{err});
+    assets.pack(virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to pack assets: {}", .{err});
     };
 
-    assets.pack(virtual_arena_allocator);
+    const atlas = assets.unpack(virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to unpack assets: {}", .{err});
+    };
+
+    var renderer = rdr.Renderer.new(window.dim, atlas, virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to create renderer: {}", .{err});
+    };
 
     var rect_topleft_x: f32 = 0;
     var rect_topleft_y: f32 = 0;
