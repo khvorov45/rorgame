@@ -147,27 +147,31 @@ const Inflator = struct {
 fn inflate(input: []u8, output: []u8) !void {
     var inflator = Inflator{ .output = ByteArray{ .buffer = output }, .input_left = input };
 
-    var lengths: [FIXLCODES]u16 = undefined;
+    const fixed = fx: {
+        var lengths: [FIXLCODES]u16 = undefined;
 
-    var symbol: usize = 0;
-    while (symbol < 144) : (symbol += 1) {
-        lengths[symbol] = 8;
-    }
-    while (symbol < 256) : (symbol += 1) {
-        lengths[symbol] = 9;
-    }
-    while (symbol < 280) : (symbol += 1) {
-        lengths[symbol] = 7;
-    }
-    while (symbol < FIXLCODES) : (symbol += 1) {
-        lengths[symbol] = 8;
-    }
+        var symbol: usize = 0;
+        while (symbol < 144) : (symbol += 1) {
+            lengths[symbol] = 8;
+        }
+        while (symbol < 256) : (symbol += 1) {
+            lengths[symbol] = 9;
+        }
+        while (symbol < 280) : (symbol += 1) {
+            lengths[symbol] = 7;
+        }
+        while (symbol < FIXLCODES) : (symbol += 1) {
+            lengths[symbol] = 8;
+        }
 
-    var len_symbols: [FIXLCODES]u16 = undefined;
-    const len_table = Huffman.fromLengths(lengths[0..len_symbols.len], len_symbols[0..]);
+        var len_symbols: [FIXLCODES]u16 = undefined;
+        const len_table = Huffman.fromLengths(lengths[0..len_symbols.len], len_symbols[0..]);
 
-    var dist_symbols: [MAXDCODES]u16 = undefined;
-    const dist_table = Huffman.fromLengths(lengths[0..dist_symbols.len], dist_symbols[0..]);
+        var dist_symbols: [MAXDCODES]u16 = undefined;
+        const dist_table = Huffman.fromLengths(lengths[0..dist_symbols.len], dist_symbols[0..]);
+
+        break :fx .{ .len = len_table, .dist = dist_table };
+    };
 
     var done = false;
     while (!done) {
@@ -176,7 +180,7 @@ fn inflate(input: []u8, output: []u8) !void {
 
         switch (block_type) {
             0 => inflator.readNotCompressed(),
-            1 => inflator.readCompressed(&len_table, &dist_table),
+            1 => inflator.readCompressed(&fixed.len, &fixed.dist),
             2 => panic("dynamic unimplemented", .{}),
             else => return error.BadBlockType,
         }
