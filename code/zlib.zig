@@ -36,7 +36,7 @@ const ByteArray = struct {
 
     pub fn append(self: *ByteArray, byte: u8) !void {
         if (self.used < self.buffer.len) {
-            self.buffer[self.used] = byte;
+            self.buffer[@intCast(usize, self.used)] = byte;
             self.used += 1;
         } else {
             return error.OutOfMemory;
@@ -95,7 +95,7 @@ const Inflator = struct {
 
         while (inflator.bit_buffer_used < bit_count) {
             const next_input_byte = byteio.readU8(&inflator.input_left);
-            value = value | (next_input_byte << @intCast(u3, inflator.bit_buffer_used));
+            value |= @intCast(u32, next_input_byte) << @intCast(u5, inflator.bit_buffer_used);
             inflator.bit_buffer_used += 8;
         }
 
@@ -106,26 +106,57 @@ const Inflator = struct {
         return needed_bits;
     }
 
-    fn readNotCompressed(inflator: *Inflator) void {
+    fn readNotCompressed(inflator: *Inflator) !void {
         _ = inflator;
         panic("no compression not implemented", .{});
     }
 
-    fn readCompressed(inflator: *Inflator, len_table: *const Huffman, dist_table: *const Huffman) void {
+    fn readCompressed(inflator: *Inflator, len_table: *const Huffman, dist_table: *const Huffman) !void {
         _ = dist_table;
 
-        const symbol = inflator.decode(len_table);
-        _ = symbol;
-        @breakpoint();
+        const lengths = [29]u16{ 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258 };
+        const lengths_extra = [29]u5{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0 };
+        const distances = [30]u16{ 1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577 };
+        const distances_extra = [30]u5{ 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13 };
+
+        var reached_end = false;
+        while (!reached_end) {
+            const symbol = inflator.decode(len_table) orelse return error.FailedToDecodeLength;
+            if (symbol < 256) {
+                try inflator.output.append(@intCast(u8, symbol));
+            } else if (symbol > 256) {
+                const length_index = symbol - 257;
+                if (length_index >= 29) return error.InvalidFixedCode;
+                const length_extra_count = lengths_extra[@intCast(usize, length_index)];
+                const length_extra = inflator.readBits(length_extra_count);
+                const length = lengths[@intCast(usize, length_index)] + length_extra;
+
+                const distance_index = inflator.decode(dist_table) orelse return error.FailedToDecodeDistance;
+                const distance_extra_count = distances_extra[@intCast(usize, distance_index)];
+                const distance_extra = inflator.readBits(distance_extra_count);
+                const distance = distances[@intCast(usize, distance_index)] + distance_extra;
+                if (distance > inflator.output.used) return error.DistanceTooFarBack;
+
+                const copy_start = @intCast(u32, inflator.output.used) - distance;
+                const copy_end = copy_start + length;
+                var copy_index = copy_start;
+                while (copy_index < copy_end) : (copy_index += 1) {
+                    const byte_to_copy = inflator.output.buffer[copy_index];
+                    try inflator.output.append(byte_to_copy);
+                }
+            }
+
+            reached_end = symbol == 256;
+        }
     }
 
-    fn decode(inflator: *Inflator, table: *const Huffman) i32 {
+    fn decode(inflator: *Inflator, table: *const Huffman) ?i32 {
         var code: i32 = 0;
         var first: i32 = 0;
         var index: i32 = 0;
         var len: i32 = 1;
 
-        var result: i32 = -10;
+        var result: ?i32 = null;
         while (len <= MAXBITS) {
             code |= @intCast(i32, inflator.readBits(1));
             const count = table.counts[@intCast(usize, len)];
@@ -167,6 +198,11 @@ fn inflate(input: []u8, output: []u8) !void {
         var len_symbols: [FIXLCODES]u16 = undefined;
         const len_table = Huffman.fromLengths(lengths[0..len_symbols.len], len_symbols[0..]);
 
+        symbol = 0;
+        while (symbol < MAXDCODES) : (symbol += 1) {
+            lengths[symbol] = 5;
+        }
+
         var dist_symbols: [MAXDCODES]u16 = undefined;
         const dist_table = Huffman.fromLengths(lengths[0..dist_symbols.len], dist_symbols[0..]);
 
@@ -179,8 +215,8 @@ fn inflate(input: []u8, output: []u8) !void {
         const block_type = inflator.readBits(2);
 
         switch (block_type) {
-            0 => inflator.readNotCompressed(),
-            1 => inflator.readCompressed(&fixed.len, &fixed.dist),
+            0 => try inflator.readNotCompressed(),
+            1 => try inflator.readCompressed(&fixed.len, &fixed.dist),
             2 => panic("dynamic unimplemented", .{}),
             else => return error.BadBlockType,
         }
@@ -188,5 +224,4 @@ fn inflate(input: []u8, output: []u8) !void {
 
         done = is_last == 1;
     }
-    @breakpoint();
 }
