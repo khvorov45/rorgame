@@ -9,50 +9,78 @@ const byteio = @import("byteio.zig");
 
 const Texture = @import("assets.zig").Texture;
 
-pub fn parse(buffer_init: []u8, allocator: mem.Allocator) !Texture {
+pub fn parse(buffer_init: []u8, allocator: mem.Allocator) ![]Texture {
     var buffer = buffer_init;
+
     const header = try parseHeader(&buffer);
-    const pixels = try allocator.alloc(u32, @intCast(usize, header.dim.x * header.dim.y));
-    for (pixels) |*px| {
-        px.* = 0;
-    }
+    const frames = try allocator.alloc(Frame, @intCast(usize, header.frame_count));
 
-    var frame_index: i32 = 0;
-    while (frame_index < header.frame_count) : (frame_index += 1) {
-        const frame_header = try parseFrameHeader(&buffer);
-        log.debug("{}", .{frame_header});
+    {
+        var frame_index: i32 = 0;
+        while (frame_index < header.frame_count) : (frame_index += 1) {
+            const frame_header = try parseFrameHeader(&buffer);
+            const frame = &frames[@intCast(usize, frame_index)];
+            frame.chunks = try allocator.alloc(Chunk, @intCast(usize, frame_header.chunk_count));
 
-        var chunk_index: i32 = 0;
-        while (chunk_index < frame_header.chunk_count) : (chunk_index += 1) {
-            const chunk = parseChunk(&buffer, header.bits_per_pixel, allocator);
-            log.debug("{}", .{chunk});
+            var chunk_index: i32 = 0;
+            while (chunk_index < frame_header.chunk_count) : (chunk_index += 1) {
+                frame.chunks[@intCast(usize, chunk_index)] = try parseChunk(&buffer, header.bits_per_pixel, allocator);
+            }
         }
     }
 
     if (buffer.len != 0) return error.DidNotParseEntireBuffer;
 
-    pixels[0] = 0;
-    pixels[1] = 0;
-    pixels[2] = 0;
-    pixels[3] = 0;
+    const textures = try allocator.alloc(Texture, frames.len);
+    for (frames) |frame, frame_index| {
+        var texture = &textures[frame_index];
+        texture.* = Texture{
+            .pixels = try allocator.alloc(u32, @intCast(usize, header.dim.x * header.dim.y)),
+            .dim = header.dim,
+        };
+        for (texture.pixels) |*px| {
+            px.* = 0;
+        }
 
-    pixels[@intCast(usize, header.dim.x) + 0] = 0;
-    pixels[@intCast(usize, header.dim.x) + 1] = 0xFFFF0000;
-    pixels[@intCast(usize, header.dim.x) + 2] = 0xFF00FF00;
-    pixels[@intCast(usize, header.dim.x) + 3] = 0;
+        var last_layer_index: i32 = -1;
+        for (frame.chunks) |chunk| {
+            switch (chunk) {
+                .cel => |cel| {
+                    assert(last_layer_index < cel.layer_index);
+                    last_layer_index = cel.layer_index;
 
-    pixels[@intCast(usize, header.dim.x) * 2 + 0] = 0;
-    pixels[@intCast(usize, header.dim.x) * 2 + 1] = 0xFF0000FF;
-    pixels[@intCast(usize, header.dim.x) * 2 + 2] = 0xFFFF00FF;
-    pixels[@intCast(usize, header.dim.x) * 2 + 3] = 0;
+                    var decompressed = cel.decompressed;
+                    var px_row = cel.pos.y;
+                    var px_col = cel.pos.x;
 
-    pixels[@intCast(usize, header.dim.x) * 3 + 0] = 0;
-    pixels[@intCast(usize, header.dim.x) * 3 + 1] = 0;
-    pixels[@intCast(usize, header.dim.x) * 3 + 2] = 0;
-    pixels[@intCast(usize, header.dim.x) * 3 + 3] = 0;
+                    while (decompressed.len > 0) {
+                        switch (header.bits_per_pixel) {
+                            32 => {
+                                const px_value = byteio.readRGBAasARGB(&decompressed);
+                                const px_index = px_row * texture.dim.x + px_col;
 
-    const texture = Texture{ .pixels = pixels, .dim = header.dim };
-    return texture;
+                                // TODO(khvorov) Alpha
+                                texture.pixels[@intCast(usize, px_index)] = px_value;
+
+                                if (px_col + 1 == cel.pos.x + cel.dim.x) {
+                                    px_col = cel.pos.x;
+                                    px_row += 1;
+                                } else {
+                                    px_col += 1;
+                                }
+                            },
+                            16 => std.debug.panic("16 bits per pixel unimplemented", .{}),
+                            8 => std.debug.panic("8 bits per pixel unimplemented", .{}),
+                            else => unreachable,
+                        }
+                    }
+                },
+                else => {},
+            }
+        }
+    }
+
+    return textures;
 }
 
 const Header = struct {
@@ -150,6 +178,10 @@ fn parseFrameHeader(buffer: *[]u8) !FrameHeader {
     return result;
 }
 
+const Frame = struct {
+    chunks: []Chunk,
+};
+
 const Chunk = union(enum) {
     old_pallette1: void,
     old_pallette2: void,
@@ -168,6 +200,7 @@ const Chunk = union(enum) {
 };
 
 const Cel = struct {
+    layer_index: i32,
     pos: math.V2i,
     dim: math.V2i,
     decompressed: []u8,
@@ -237,6 +270,7 @@ fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator
     try zlib.decompress(chunk_data, decompressed);
 
     const result = Cel{
+        .layer_index = @intCast(i32, layer_index),
         .pos = pos,
         .dim = dim,
         .decompressed = decompressed,

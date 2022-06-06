@@ -11,6 +11,19 @@ pub fn readU32le(buffer: *[]u8) u32 {
     return result;
 }
 
+pub fn readRGBAasARGB(buffer: *[]u8) u32 {
+    const bytes = buffer.*[0..4];
+    buffer.* = buffer.*[4..];
+
+    const result =
+        (@intCast(u32, bytes[3]) << 24) |
+        (@intCast(u32, bytes[0]) << 16) |
+        (@intCast(u32, bytes[1]) << 8) |
+        (@intCast(u32, bytes[2]));
+
+    return result;
+}
+
 pub fn readU16le(buffer: *[]u8) u32 {
     const bytes = buffer.*[0..2];
     buffer.* = buffer.*[2..];

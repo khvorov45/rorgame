@@ -82,6 +82,7 @@ pub const Renderer = struct {
                     final_color = blend.toU32ARGB();
                 }
 
+                // TODO(khvorov) Alpha
                 const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
                 renderer.draw_buffer.pixels[px_index] = final_color;
             }

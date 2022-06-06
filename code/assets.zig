@@ -17,9 +17,10 @@ pub const Assets = struct {
 
     pub fn fromSources(allocator: mem.Allocator) !Assets {
         const commando_ase = try fs.readEntireFile("assets/commando.ase", allocator);
-        const commando_texture = try ase.parse(commando_ase, allocator);
+        const commando_textures = try ase.parse(commando_ase, allocator);
 
-        const result = Assets{ .atlas = commando_texture };
+        // TODO(khvorov) Build the atlas
+        const result = Assets{ .atlas = commando_textures[0] };
         return result;
     }
 };

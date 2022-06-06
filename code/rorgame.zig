@@ -66,7 +66,7 @@ pub fn main() noreturn {
         renderer.drawRect(
             math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = math.V2f{ .x = 200, .y = 200 } },
             math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
-            math.Rect2f{ .topleft = math.V2f{ .x = 1, .y = 1 }, .dim = math.V2f{ .x = 2, .y = 2 } },
+            math.Rect2f{ .topleft = math.V2f{ .x = 1, .y = 1 }, .dim = math.V2f{ .x = 14, .y = 14 } },
         );
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
