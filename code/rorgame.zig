@@ -54,8 +54,8 @@ pub fn main() noreturn {
         // SECTION Update
         //
 
-        rect_topleft_x += 0.01;
-        rect_topleft_y += 0.005;
+        rect_topleft_x += 0.2;
+        rect_topleft_y += 0.1;
 
         //
         // SECTION Render
@@ -64,9 +64,15 @@ pub fn main() noreturn {
         renderer.clearBuffers();
 
         renderer.drawRect(
-            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = math.V2f{ .x = 200, .y = 200 } },
+            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = assets.commando.dim.mulf(10) },
             math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
-            math.Rect2f{ .topleft = math.V2f{ .x = 1, .y = 1 }, .dim = math.V2f{ .x = 14, .y = 14 } },
+            assets.commando,
+        );
+
+        renderer.drawRect(
+            math.Rect2f{ .topleft = math.V2f{ .x = @round(rect_topleft_x), .y = @round(rect_topleft_y + assets.commando.dim.y * 10 + 10) }, .dim = assets.commando.dim.mulf(10) },
+            math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
+            assets.commando,
         );
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);

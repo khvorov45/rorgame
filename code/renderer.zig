@@ -24,8 +24,6 @@ pub const Renderer = struct {
     }
 
     pub fn drawRect(renderer: *Renderer, rect: math.Rect2f, color: math.Color, texture_coords: ?math.Rect2f) void {
-        const color32 = color.toU32ARGB();
-
         const rect_clipped = rect.clipToRect(math.Rect2f{ .topleft = math.V2f{ .x = 0, .y = 0 }, .dim = renderer.draw_buffer.dim.to(math.V2f) });
         const bottomright = rect_clipped.bottomright();
 
@@ -36,7 +34,7 @@ pub const Renderer = struct {
         while (row < @floatToInt(i32, bottomright_aligned.y)) : (row += 1) {
             var col = @floatToInt(i32, topleft_aligned.x);
             while (col < @floatToInt(i32, bottomright_aligned.x)) : (col += 1) {
-                var final_color = color32;
+                var final_tex_color = color;
 
                 if (texture_coords) |coords| {
                     const u_left = (@intToFloat(f32, col) - rect.topleft.x) / rect.dim.x;
@@ -72,19 +70,22 @@ pub const Renderer = struct {
                     const texel_bottomleft = math.Color.fromU32ARGB(texel_bottomleft_u32);
                     const texel_bottomright = math.Color.fromU32ARGB(texel_bottomright_u32);
 
-                    const px_on_left = (@floor(tex_colf_left + 1) - tex_colf_left) / (tex_colf_right - tex_colf_left);
-                    const px_on_top = (@floor(tex_rowf_top + 1) - tex_rowf_top) / (tex_rowf_bottom - tex_rowf_top);
+                    const px_on_left = @minimum((@floor(tex_colf_left + 1) - tex_colf_left) / (tex_colf_right - tex_colf_left), 1);
+                    const px_on_top = @minimum((@floor(tex_rowf_top + 1) - tex_rowf_top) / (tex_rowf_bottom - tex_rowf_top), 1);
 
-                    const blend_top = texel_topleft.mul(px_on_left).add(texel_topright.mul(1 - px_on_left));
-                    const blend_bottom = texel_bottomleft.mul(px_on_left).add(texel_bottomright.mul(1 - px_on_left));
-                    const blend = blend_top.mul(px_on_top).add(blend_bottom.mul(1 - px_on_top));
+                    const blend_top = texel_topleft.transitionBlend(px_on_left, texel_topright);
+                    const blend_bottom = texel_bottomleft.transitionBlend(px_on_left, texel_bottomright);
+                    const blend = blend_top.transitionBlend(px_on_top, blend_bottom);
 
-                    final_color = blend.toU32ARGB();
+                    final_tex_color = blend;
                 }
 
-                // TODO(khvorov) Alpha
                 const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
-                renderer.draw_buffer.pixels[px_index] = final_color;
+                const old_px = &renderer.draw_buffer.pixels[px_index];
+                const old_col = math.Color.fromU32ARGB(old_px.*);
+                const new_col = final_tex_color.mul(final_tex_color.a).add(old_col.mul(1 - final_tex_color.a));
+                const new_col32 = new_col.toU32ARGB();
+                old_px.* = new_col32;
             }
         }
     }

@@ -19,6 +19,10 @@ fn V2(comptime T: type) type {
             return @This(){ .x = self.x - other.x, .y = self.y - other.y };
         }
 
+        pub fn mulf(self: @This(), other: T) @This() {
+            return @This(){ .x = self.x * other, .y = self.y * other };
+        }
+
         pub fn floor(self: @This()) @This() {
             return @This(){ .x = @floor(self.x), .y = @floor(self.y) };
         }
@@ -79,10 +83,10 @@ pub const Color = struct {
 
     pub fn toU32ARGB(color: Color) u32 {
         const color255 = color.mul(255);
-        const aU32 = @floatToInt(u32, color255.a) & 0xFF;
-        const rU32 = @floatToInt(u32, color255.r) & 0xFF;
-        const gU32 = @floatToInt(u32, color255.g) & 0xFF;
-        const bU32 = @floatToInt(u32, color255.b) & 0xFF;
+        const aU32 = @floatToInt(u32, @minimum(@maximum(color255.a, 0), 255)) & 0xFF;
+        const rU32 = @floatToInt(u32, @minimum(@maximum(color255.r, 0), 255)) & 0xFF;
+        const gU32 = @floatToInt(u32, @minimum(@maximum(color255.g, 0), 255)) & 0xFF;
+        const bU32 = @floatToInt(u32, @minimum(@maximum(color255.b, 0), 255)) & 0xFF;
         const result = (aU32 << 24) | (rU32 << 16) | (gU32 << 8) | bU32;
         return result;
     }
@@ -95,4 +99,24 @@ pub const Color = struct {
         const result = Color{ .r = r, .g = g, .b = b, .a = a };
         return result;
     }
+
+    pub fn transitionBlend(start: Color, on_start: f32, end: Color) Color {
+        const final_alpha = start.a * on_start + end.a * (1 - on_start);
+        const start_rgb_coef = safeRatio0(on_start * start.a, final_alpha);
+        const end_rgb_coef = safeRatio0((1 - on_start) * end.a, final_alpha);
+        const result = Color{
+            .r = start_rgb_coef * start.r + end_rgb_coef * end.r,
+            .g = start_rgb_coef * start.g + end_rgb_coef * end.g,
+            .b = start_rgb_coef * start.b + end_rgb_coef * end.b,
+            .a = final_alpha,
+        };
+        return result;
+    }
 };
+
+fn safeRatio0(v1: f32, v2: f32) f32 {
+    if (v2 == 0) {
+        return 0;
+    }
+    return v1 / v2;
+}
