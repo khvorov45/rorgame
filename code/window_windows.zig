@@ -1,6 +1,7 @@
 const math = @import("math.zig");
 const log = @import("log.zig");
 const win = @import("windows_bindings.zig");
+const Input = @import("input.zig").Input;
 const outputWindowsError = @import("log_windows.zig").outputWindowsError;
 
 pub const PlatformWindow = struct {
@@ -59,30 +60,25 @@ pub const Window = struct {
 
         const platform = PlatformWindow{ .hwnd = hwnd, .bmi = bmi, .hdc = hdc };
         window.* = Window{ .is_running = true, .dim = dim, .platform = platform };
-    }
+    }    
 
-    fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(win.WINAPI) win.LRESULT {
-        var maybe_window = @intToPtr(?*Window, @bitCast(usize, win.GetWindowLongPtrW(hwnd, win.GWLP_USERDATA)));
+    pub fn pollForInput(window: *Window, input: *Input) void {
+        input.clearKeys();
 
-        if (maybe_window) |window| {
-            switch (msg) {
-                win.WM_CLOSE, win.WM_DESTROY => window.is_running = false,
-                else => {},
-            }
-        }
-
-        return win.DefWindowProcW(hwnd, msg, wparam, lparam);
-    }
-
-    pub fn pollForInput(window: *Window) void {
         var msg: win.MSG = undefined;
         while (win.PeekMessageW(&msg, window.platform.hwnd, 0, 0, win.PM_REMOVE) == win.TRUE) {
             switch (msg.message) {
-                else => {
-                    _ = win.TranslateMessage(&msg);
-                    _ = win.DispatchMessageW(&msg);
+                win.WM_KEYDOWN => {
+                    switch (msg.wParam) {
+                        win.VK_F5 => input.keys.getPtr(.f5).pressed = true,
+                        else => {},
+                    }
                 },
+                else => {},
             }
+
+            _ = win.TranslateMessage(&msg);
+            _ = win.DispatchMessageW(&msg);
         }
     }
 
@@ -106,3 +102,16 @@ pub const Window = struct {
         );
     }
 };
+
+fn wndProc(hwnd: win.HWND, msg: win.UINT, wparam: win.WPARAM, lparam: win.LPARAM) callconv(win.WINAPI) win.LRESULT {
+    var maybe_window = @intToPtr(?*Window, @bitCast(usize, win.GetWindowLongPtrW(hwnd, win.GWLP_USERDATA)));
+
+    if (maybe_window) |window| {
+        switch (msg) {
+            win.WM_CLOSE, win.WM_DESTROY => window.is_running = false,
+            else => {},
+        }
+    }
+
+    return win.DefWindowProcW(hwnd, msg, wparam, lparam);
+}

@@ -8,6 +8,7 @@ const rdr = @import("renderer.zig");
 const log = @import("log.zig");
 const fs = @import("filesystem.zig");
 const Assets = @import("assets.zig").Assets;
+const Input = @import("input.zig").Input;
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
@@ -30,13 +31,19 @@ pub fn main() noreturn {
         std.debug.panic("failed to init window: {}", .{err});
     };
 
-    const assets = Assets.fromSources(virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to pack assets: {}", .{err});
+    var assets_arena = mem.Arena.new(100 * mem.MEGABYTE, virtual_arena_allocator) catch |err| {
+        std.debug.panic("failed to create assets arena: {}", .{err});
+    };
+    const assets_arena_allocator = assets_arena.allocator();
+    var assets = Assets.fromSources(assets_arena_allocator) catch |err| {
+        std.debug.panic("failed to load assets from sources: {}", .{err});
     };
 
     var renderer = rdr.Renderer.new(window.dim, assets.atlas, virtual_arena_allocator) catch |err| {
         std.debug.panic("failed to create renderer: {}", .{err});
     };
+
+    var input = Input.new();
 
     var rect_topleft_x: f32 = 0;
     var rect_topleft_y: f32 = 0;
@@ -48,14 +55,21 @@ pub fn main() noreturn {
         // SECTION Input
         //
 
-        window.pollForInput();
+        window.pollForInput(&input);
+
+        if (input.keys.get(.f5).pressed) {
+            assets_arena.used = 0;
+            assets = Assets.fromSources(assets_arena_allocator) catch |err| {
+                std.debug.panic("failed to load assets from sources: {}", .{err});
+            };
+        }
 
         //
         // SECTION Update
         //
 
-        rect_topleft_x += 0.2;
-        rect_topleft_y += 0.1;
+        rect_topleft_x += 0;
+        rect_topleft_y += 0;
 
         //
         // SECTION Render
