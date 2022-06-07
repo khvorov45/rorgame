@@ -79,6 +79,4 @@ pub fn main() !void {
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
     }
-
-    platform.exit();
 }
