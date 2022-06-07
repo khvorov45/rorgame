@@ -6,7 +6,10 @@ const log = @import("log.zig");
 const outputWindowsError = @import("log_windows.zig").outputWindowsError;
 
 pub fn readEntireFile(comptime filename: []const u8, allocator: mem.Allocator) ![]u8 {
-    errdefer outputWindowsError();
+    errdefer {
+        outputWindowsError();
+        log.err("failed to read {s}", .{filename});
+    }
 
     const handle = win.CreateFileW(
         win.L(filename),
@@ -17,6 +20,7 @@ pub fn readEntireFile(comptime filename: []const u8, allocator: mem.Allocator) !
         win.FILE_ATTRIBUTE_NORMAL,
         null,
     );
+    defer _ = win.CloseHandle(handle);
     if (handle == win.INVALID_HANDLE_VALUE) return error.CreateFileW;
 
     var file_size: win.LARGE_INTEGER = undefined;
@@ -31,7 +35,10 @@ pub fn readEntireFile(comptime filename: []const u8, allocator: mem.Allocator) !
 }
 
 pub fn writeEntireFileToExeDir(comptime filename: []const u8) !void {
-    errdefer outputWindowsError();
+    errdefer {
+        outputWindowsError();
+        log.err("failed to write {s} to exe dir", .{filename});
+    }
 
     const exe_filename_buffer_size = 4096;
     var exe_filename_buffer: [4096]win.WCHAR = undefined;
@@ -65,6 +72,7 @@ pub fn writeEntireFileToExeDir(comptime filename: []const u8) !void {
         win.FILE_ATTRIBUTE_NORMAL,
         null,
     );
+    defer _ = win.CloseHandle(handle);
     if (handle == win.INVALID_HANDLE_VALUE) return error.CreateFileW;
 
     const file_content = [_]u8{ 't', 'e', 's' };

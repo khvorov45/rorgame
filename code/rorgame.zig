@@ -20,28 +20,18 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace) noreturn {
     platform.panic_exit();
 }
 
-pub fn main() noreturn {
-    var virtual_arena = mem.VirtualArena.new(1 * mem.GIGABYTE, 1 * mem.MEGABYTE) catch |err| {
-        std.debug.panic("failed to allocate memory: {}", .{err});
-    };
+pub fn main() !void {
+    var virtual_arena = try mem.VirtualArena.new(1 * mem.GIGABYTE, 1 * mem.MEGABYTE);
     const virtual_arena_allocator = virtual_arena.allocator();
 
     var window: wnd.Window = undefined;
-    window.init(math.V2i{ .x = 1280, .y = 720 }) catch |err| {
-        std.debug.panic("failed to init window: {}", .{err});
-    };
+    try window.init(math.V2i{ .x = 1280, .y = 720 });
 
-    var assets_arena = mem.Arena.new(100 * mem.MEGABYTE, virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to create assets arena: {}", .{err});
-    };
+    var assets_arena = try mem.Arena.new(1 * mem.MEGABYTE, virtual_arena_allocator);
     const assets_arena_allocator = assets_arena.allocator();
-    var assets = Assets.fromSources(assets_arena_allocator) catch |err| {
-        std.debug.panic("failed to load assets from sources: {}", .{err});
-    };
+    var assets = try Assets.fromSources(assets_arena_allocator);
 
-    var renderer = rdr.Renderer.new(window.dim, assets.atlas, virtual_arena_allocator) catch |err| {
-        std.debug.panic("failed to create renderer: {}", .{err});
-    };
+    var renderer = try rdr.Renderer.new(window.dim, assets.atlas, virtual_arena_allocator);
 
     var input = Input.new();
 
@@ -59,9 +49,7 @@ pub fn main() noreturn {
 
         if (input.keys.get(.f5).pressed) {
             assets_arena.used = 0;
-            assets = Assets.fromSources(assets_arena_allocator) catch |err| {
-                std.debug.panic("failed to load assets from sources: {}", .{err});
-            };
+            assets = try Assets.fromSources(assets_arena_allocator);
         }
 
         //

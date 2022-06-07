@@ -119,3 +119,58 @@ pub const VirtualArenaTemp = struct {
         temp.varena.used = temp.used;
     }
 };
+
+pub const Arena = struct {
+    memory: []u8,
+    used: usize,
+
+    pub fn new(size: usize, al: Allocator) !Arena {
+        var arena = Arena{
+            .memory = try al.allocWithOptions(u8, size, 2 * @alignOf(*u8), null),
+            .used = 0,
+        };
+        return arena;
+    }
+
+    fn alloc(arena: *Arena, size: usize, ptr_align: u29, len_align: u29, ret_addr: usize) ![]u8 {
+        _ = len_align;
+        _ = ret_addr;
+
+        var base_aligned = arena.memory.ptr + arena.used;
+        var size_aligned = size;
+        alignPtr(&base_aligned, ptr_align, &size_aligned);
+
+        const mem_free = arena.memory.len - arena.used;
+
+        if (mem_free >= size_aligned) {
+            arena.used += size_aligned;
+            return base_aligned[0..size];
+        } else {
+            log.err("arena (size {}, used {}) out of memory, asked for {} bytes", .{ arena.memory.len, arena.used, size_aligned });
+            return error.OutOfMemory;
+        }
+    }
+
+    fn resize(arena: *Arena, buf: []u8, buf_align: u29, new_len: usize, len_align: u29, ret_addr: usize) ?usize {
+        _ = arena;
+        _ = buf;
+        _ = buf_align;
+        _ = new_len;
+        _ = len_align;
+        _ = ret_addr;
+        panic("arena resize", .{});
+        return null;
+    }
+
+    fn free(arena: *Arena, buf: []u8, buf_align: u29, ret_addr: usize) void {
+        _ = arena;
+        _ = buf;
+        _ = buf_align;
+        _ = ret_addr;
+        panic("arena free", .{});
+    }
+
+    pub fn allocator(arena: *Arena) std.mem.Allocator {
+        return Allocator.init(arena, alloc, resize, free);
+    }
+};
