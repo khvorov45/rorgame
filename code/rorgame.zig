@@ -47,14 +47,14 @@ pub fn main() !void {
 
         window.pollForInput(&input);
 
+        //
+        // SECTION Update
+        //
+
         if (input.pressed(.f5)) {
             assets_arena.used = 0;
             assets = try Assets.fromSources(assets_arena_allocator);
         }
-
-        //
-        // SECTION Update
-        //
 
         if (input.down(.left)) {
             rect_topleft_x -= 0.5;
