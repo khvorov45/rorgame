@@ -4,7 +4,7 @@ pub const Input = struct {
     keys: EnumArray(KeyID, Key),
 
     pub fn new() Input {
-        var input = Input{.keys = undefined};
+        var input = Input{ .keys = undefined };
         input.clearKeys();
         return input;
     }

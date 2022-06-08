@@ -62,7 +62,7 @@ pub const Window = struct {
 
         const platform = PlatformWindow{ .hwnd = hwnd, .bmi = bmi, .hdc = hdc };
         window.* = Window{ .is_running = true, .dim = dim, .platform = platform };
-    }    
+    }
 
     pub fn pollForInput(window: *Window, input: *Input) void {
         input.clearHalfTransitionCounts();
