@@ -47,7 +47,7 @@ pub fn main() !void {
 
         window.pollForInput(&input);
 
-        if (input.keys.get(.f5).pressed) {
+        if (input.pressed(.f5)) {
             assets_arena.used = 0;
             assets = try Assets.fromSources(assets_arena_allocator);
         }
@@ -55,6 +55,14 @@ pub fn main() !void {
         //
         // SECTION Update
         //
+
+        if (input.down(.left)) {
+            rect_topleft_x -= 0.5;
+        }
+
+        if (input.down(.right)) {
+            rect_topleft_x += 0.5;
+        }
 
         rect_topleft_x += 0;
         rect_topleft_y += 0;

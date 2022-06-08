@@ -1,7 +1,9 @@
 const math = @import("math.zig");
 const log = @import("log.zig");
 const win = @import("windows_bindings.zig");
-const Input = @import("input.zig").Input;
+const inp = @import("input.zig");
+const Input = inp.Input;
+const KeyID = inp.KeyID;
 const outputWindowsError = @import("log_windows.zig").outputWindowsError;
 
 pub const PlatformWindow = struct {
@@ -63,15 +65,21 @@ pub const Window = struct {
     }    
 
     pub fn pollForInput(window: *Window, input: *Input) void {
-        input.clearKeys();
+        input.clearHalfTransitionCounts();
 
         var msg: win.MSG = undefined;
         while (win.PeekMessageW(&msg, window.platform.hwnd, 0, 0, win.PM_REMOVE) == win.TRUE) {
             switch (msg.message) {
-                win.WM_KEYDOWN => {
-                    switch (msg.wParam) {
-                        win.VK_F5 => input.keys.getPtr(.f5).pressed = true,
-                        else => {},
+                win.WM_KEYDOWN, win.WM_KEYUP => {
+                    const maybe_key: ?KeyID = switch (msg.wParam) {
+                        win.VK_F5 => .f5,
+                        win.VK_LEFT => .left,
+                        win.VK_RIGHT => .right,
+                        else => null,
+                    };
+                    if (maybe_key) |key| {
+                        const down = msg.message == win.WM_KEYDOWN;
+                        input.keyEvent(key, down);
                     }
                 },
                 else => {},
