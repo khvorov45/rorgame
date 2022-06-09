@@ -12,6 +12,10 @@ const Input = @import("input.zig").Input;
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
+const FT_Error = i32;
+const FT_Library = *opaque {};
+extern fn FT_Init_FreeType(alibrary: *FT_Library) callconv(.C) FT_Error;
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace) noreturn {
     _ = trace;
     @setCold(true);
@@ -37,6 +41,9 @@ pub fn main() !void {
 
     var rect_topleft_x: f32 = 0;
     var rect_topleft_y: f32 = 0;
+
+    var ft_lib: FT_Library = undefined;
+    _ = FT_Init_FreeType(&ft_lib);
 
     while (window.is_running) {
         std.debug.assert(virtual_arena.temp_count == 0);

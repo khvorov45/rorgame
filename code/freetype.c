@@ -2,12 +2,45 @@
 // https://github.com/freetype/freetype
 
 #include <stdint.h>
+#include <limits.h>
+
+#define FT_CHAR_BIT    CHAR_BIT
+#define FT_USHORT_MAX  USHRT_MAX
+#define FT_INT_MAX     INT_MAX
+#define FT_INT_MIN     INT_MIN
+#define FT_UINT_MAX    UINT_MAX
+#define FT_LONG_MIN    LONG_MIN
+#define FT_LONG_MAX    LONG_MAX
+#define FT_ULONG_MAX   ULONG_MAX
+#ifdef LLONG_MAX
+#define FT_LLONG_MAX   LLONG_MAX
+#endif
+#ifdef LLONG_MIN
+#define FT_LLONG_MIN   LLONG_MIN
+#endif
+#ifdef ULLONG_MAX
+#define FT_ULLONG_MAX  ULLONG_MAX
+#endif
 
 #define NULL 0
 
+#define FREETYPE_MAJOR  2
+#define FREETYPE_MINOR  12
+#define FREETYPE_PATCH  0
+
 #define FT_EXPORT_DEF(x) x
 
-#define FT_Err_Invalid_Argument 0x06;
+#define FT_FUNCTION_DEFINITION( x )  x
+#define FT_BASE_DEF( x )  FT_FUNCTION_DEFINITION( x )
+#define FT_CALLBACK_DEF( x )  static  x
+
+#define FT_UNUSED( arg )  ( (arg) = (arg) )
+
+#define FT_Err_Ok 0x00
+#define FT_Err_Invalid_Argument 0x06
+#define FT_Err_Unimplemented_Feature 0x07
+#define FT_Err_Out_Of_Memory 0x40
+#define FT_Err_Array_Too_Large 0x0A
 
 #define FT_ERR_PREFIX FT_Err_
 #define FT_ERR_XCAT(x, y) x ## y
@@ -838,4 +871,343 @@ FT_New_Memory_Face( FT_Library      library,
   args.stream      = NULL;
 
   return ft_open_face_internal( library, &args, face_index, aface, 1 );
+}
+
+
+#if FREETYPE_WINDOWS
+
+typedef void *HANDLE;
+typedef void *LPVOID;
+typedef uint32_t DWORD;
+typedef size_t SIZE_T;
+typedef int WINBOOL;
+
+HANDLE GetProcessHeap();
+LPVOID HeapAlloc(HANDLE hHeap, DWORD dwFlags, SIZE_T dwBytes);
+LPVOID HeapReAlloc (HANDLE hHeap, DWORD dwFlags, LPVOID lpMem, SIZE_T dwBytes);
+WINBOOL HeapFree (HANDLE hHeap, DWORD dwFlags, LPVOID lpMem);
+
+FT_CALLBACK_DEF( void* )
+ft_alloc( FT_Memory  memory,
+          long       size )
+{
+  return HeapAlloc( memory->user, 0, size );
+}
+
+FT_CALLBACK_DEF( void* )
+ft_realloc( FT_Memory  memory,
+            long       cur_size,
+            long       new_size,
+            void*      block )
+{
+  FT_UNUSED( cur_size );
+  return HeapReAlloc( memory->user, 0, block, new_size );
+}
+
+FT_CALLBACK_DEF( void )
+ft_free( FT_Memory  memory,
+         void*      block )
+{
+  HeapFree( memory->user, 0, block );
+}
+
+FT_BASE_DEF( FT_Memory )
+FT_New_Memory( void )
+{
+  HANDLE     heap;
+  FT_Memory  memory;
+
+  heap   = GetProcessHeap();
+  memory = heap ? (FT_Memory)HeapAlloc( heap, 0, sizeof ( *memory ) ) : NULL;
+
+  if ( memory )
+  {
+    memory->user    = heap;
+    memory->alloc   = ft_alloc;
+    memory->realloc = ft_realloc;
+    memory->free    = ft_free;
+#ifdef FT_DEBUG_MEMORY
+    ft_mem_debug_init( memory );
+#endif
+  }
+
+  return memory;
+}
+
+#endif // FREETYPE_WINDOWS
+
+#define FT_ASSERT( condition )  do { } while ( 0 )
+
+void
+ft_memset(void* dest, uint8_t byte, uintptr_t count) {
+  while (count--) *(uint8_t*)dest++ = byte;
+}
+
+void*
+ft_memcpy(void *dest, const void *src, size_t n) {
+  void* destOg = dest;
+  while (n--) *(uint8_t*)dest++ = *(uint8_t*)src++;
+  return destOg;
+}
+
+size_t 
+ft_strlen(const char *str) {
+  size_t result = 0;
+  while (*str++) ++result;
+  return result;
+}
+
+#define FT_MEM_SET( dest, byte, count ) ft_memset( dest, byte, (FT_Offset)(count) )
+#define FT_MEM_ZERO( dest, count )  FT_MEM_SET( dest, 0, count )
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_qalloc( FT_Memory  memory,
+               FT_Long    size,
+               FT_Error  *p_error )
+{
+  FT_Error    error = FT_Err_Ok;
+  FT_Pointer  block = NULL;
+
+
+  if ( size > 0 )
+  {
+    block = memory->alloc( memory, size );
+    if ( !block )
+      error = FT_THROW( Out_Of_Memory );
+  }
+  else if ( size < 0 )
+  {
+    /* may help catch/prevent security issues */
+    error = FT_THROW( Invalid_Argument );
+  }
+
+  *p_error = error;
+  return block;
+}
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_alloc( FT_Memory  memory,
+              FT_Long    size,
+              FT_Error  *p_error )
+{
+  FT_Error    error;
+  FT_Pointer  block = ft_mem_qalloc( memory, size, &error );
+
+  if ( !error && block && size > 0 )
+    FT_MEM_ZERO( block, size );
+
+  *p_error = error;
+  return block;
+}
+
+FT_BASE_DEF( void )
+ft_mem_free( FT_Memory   memory,
+             const void *P )
+{
+  if ( P )
+    memory->free( memory, (void*)P );
+}
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_qrealloc( FT_Memory  memory,
+                 FT_Long    item_size,
+                 FT_Long    cur_count,
+                 FT_Long    new_count,
+                 void*      block,
+                 FT_Error  *p_error )
+{
+  FT_Error  error = FT_Err_Ok;
+
+
+  /* Note that we now accept `item_size == 0' as a valid parameter, in
+   * order to cover very weird cases where an ALLOC_MULT macro would be
+   * called.
+   */
+  if ( cur_count < 0 || new_count < 0 || item_size < 0 )
+  {
+    /* may help catch/prevent nasty security issues */
+    error = FT_THROW( Invalid_Argument );
+  }
+  else if ( new_count == 0 || item_size == 0 )
+  {
+    ft_mem_free( memory, block );
+    block = NULL;
+  }
+  else if ( new_count > FT_INT_MAX / item_size )
+  {
+    error = FT_THROW( Array_Too_Large );
+  }
+  else if ( cur_count == 0 )
+  {
+    FT_ASSERT( !block );
+
+    block = memory->alloc( memory, new_count * item_size );
+    if ( block == NULL )
+      error = FT_THROW( Out_Of_Memory );
+  }
+  else
+  {
+    FT_Pointer  block2;
+    FT_Long     cur_size = cur_count * item_size;
+    FT_Long     new_size = new_count * item_size;
+
+
+    block2 = memory->realloc( memory, cur_size, new_size, block );
+    if ( !block2 )
+      error = FT_THROW( Out_Of_Memory );
+    else
+      block = block2;
+  }
+
+  *p_error = error;
+  return block;
+}
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_realloc( FT_Memory  memory,
+                FT_Long    item_size,
+                FT_Long    cur_count,
+                FT_Long    new_count,
+                void*      block,
+                FT_Error  *p_error )
+{
+  FT_Error  error = FT_Err_Ok;
+
+
+  block = ft_mem_qrealloc( memory, item_size,
+                           cur_count, new_count, block, &error );
+  if ( !error && block && new_count > cur_count )
+    FT_MEM_ZERO( (char*)block + cur_count * item_size,
+                 ( new_count - cur_count ) * item_size );
+
+  *p_error = error;
+  return block;
+}
+
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_dup( FT_Memory    memory,
+            const void*  address,
+            FT_ULong     size,
+            FT_Error    *p_error )
+{
+  FT_Error    error;
+  FT_Pointer  p = ft_mem_qalloc( memory, (FT_Long)size, &error );
+
+
+  if ( !error && address && size > 0 )
+    ft_memcpy( p, address, size );
+
+  *p_error = error;
+  return p;
+}
+
+
+FT_BASE_DEF( FT_Pointer )
+ft_mem_strdup( FT_Memory    memory,
+               const char*  str,
+               FT_Error    *p_error )
+{
+  FT_ULong  len = str ? (FT_ULong)ft_strlen( str ) + 1
+                      : 0;
+
+
+  return ft_mem_dup( memory, str, len, p_error );
+}
+
+
+FT_BASE_DEF( FT_Int )
+ft_mem_strcpyn( char*        dst,
+                const char*  src,
+                FT_ULong     size )
+{
+  while ( size > 1 && *src != 0 )
+  {
+    *dst++ = *src++;
+    size--;
+  }
+
+  *dst = 0;  /* always zero-terminate */
+
+  return *src != 0;
+}
+
+#define FT_ASSIGNP( p, val )  (p) = (val)
+#define FT_ASSIGNP_INNER( p, exp )  FT_ASSIGNP( p, exp )
+#define FT_MEM_ALLOC( ptr, size ) FT_ASSIGNP_INNER( ptr, ft_mem_alloc( memory, (FT_Long)(size), &error ) )
+#define FT_MEM_NEW( ptr ) FT_MEM_ALLOC( ptr, sizeof ( *(ptr) ) )
+#define FT_MEM_SET_ERROR( cond )  ( (cond), error != 0 )
+#define FT_NEW( ptr )  FT_MEM_SET_ERROR( FT_MEM_NEW( ptr ) )
+
+FT_EXPORT_DEF( FT_Error )
+FT_New_Library( FT_Memory    memory,
+                FT_Library  *alibrary )
+{
+  FT_Library  library = NULL;
+  FT_Error    error;
+
+  if ( !memory || !alibrary )
+    return FT_THROW( Invalid_Argument );
+
+#ifndef FT_DEBUG_LOGGING
+#ifdef FT_DEBUG_LEVEL_ERROR
+  /* init debugging support */
+  ft_debug_init();
+#endif /* FT_DEBUG_LEVEL_ERROR */
+#endif /* !FT_DEBUG_LOGGING */
+
+  /* first of all, allocate the library object */
+  if ( FT_NEW( library ) )
+    return error;
+
+  library->memory = memory;
+
+  library->version_major = FREETYPE_MAJOR;
+  library->version_minor = FREETYPE_MINOR;
+  library->version_patch = FREETYPE_PATCH;
+
+  library->refcount = 1;
+
+  /* That's ok now */
+  *alibrary = library;
+
+  return FT_Err_Ok;
+}
+
+FT_EXPORT_DEF( FT_Error )
+FT_Init_FreeType( FT_Library  *alibrary )
+{
+  FT_Error   error;
+  FT_Memory  memory;
+
+#ifdef FT_DEBUG_LOGGING
+  ft_logging_init();
+#endif
+
+  /* check of `alibrary' delayed to `FT_New_Library' */
+
+  /* First of all, allocate a new system object -- this function is part */
+  /* of the system-specific component, i.e. `ftsystem.c'.                */
+
+  memory = FT_New_Memory();
+
+  if ( !memory )
+  {
+    //FT_ERROR(( "FT_Init_FreeType: cannot find memory manager\n" ));
+    return FT_THROW( Unimplemented_Feature );
+  }
+
+  /* build a library out of it, then fill it with the set of */
+  /* default drivers.                                        */
+
+  error = FT_New_Library( memory, alibrary );
+  #if 0
+  if ( error )
+    FT_Done_Memory( memory );
+  else
+    FT_Add_Default_Modules( *alibrary );
+
+  FT_Set_Default_Properties( *alibrary );
+  #endif
+  return error;
 }
