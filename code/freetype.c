@@ -423,21 +423,52 @@ typedef struct  FT_Renderer_Class_ {
   FT_Raster_Funcs*           raster_class;
 } FT_Renderer_Class;
 
+typedef struct FT_Glyph_Class_  FT_Glyph_Class;
+
+typedef struct FT_GlyphRec_ {
+  FT_Library             library;
+  const FT_Glyph_Class*  clazz;
+  FT_Glyph_Format        format;
+  FT_Vector              advance;
+} FT_GlyphRec;
+
+typedef struct FT_GlyphRec_*  FT_Glyph;
+
+typedef FT_Error
+(*FT_Glyph_InitFunc)( FT_Glyph      glyph,
+                      FT_GlyphSlot  slot );
+
+typedef void
+(*FT_Glyph_DoneFunc)( FT_Glyph  glyph );
+
+typedef void
+(*FT_Glyph_TransformFunc)( FT_Glyph          glyph,
+                           const FT_Matrix*  matrix,
+                           const FT_Vector*  delta );
+
+typedef void
+(*FT_Glyph_GetBBoxFunc)( FT_Glyph  glyph,
+                         FT_BBox*  abbox );
+
+typedef FT_Error
+(*FT_Glyph_CopyFunc)( FT_Glyph   source,
+                      FT_Glyph   target );
+
+typedef FT_Error
+(*FT_Glyph_PrepareFunc)( FT_Glyph      glyph,
+                         FT_GlyphSlot  slot );
+
 struct  FT_Glyph_Class_ {
   FT_Long                 glyph_size;
   FT_Glyph_Format         glyph_format;
 
-#if 0
   FT_Glyph_InitFunc       glyph_init;
   FT_Glyph_DoneFunc       glyph_done;
   FT_Glyph_CopyFunc       glyph_copy;
   FT_Glyph_TransformFunc  glyph_transform;
   FT_Glyph_GetBBoxFunc    glyph_bbox;
   FT_Glyph_PrepareFunc    glyph_prepare;
-#endif
 };
-
-typedef struct FT_Glyph_Class_  FT_Glyph_Class;
 
 typedef struct  FT_RendererRec_ {
   FT_ModuleRec            root;
@@ -449,6 +480,9 @@ typedef struct  FT_RendererRec_ {
   FT_Raster_Render_Func   raster_render;
   FT_Renderer_RenderFunc  render;
 } FT_RendererRec;
+
+typedef FT_Error
+(*FT_DebugHook_Func)( void*  arg );
 
 typedef struct FT_LibraryRec_ {
   FT_Memory          memory;           /* library's memory manager */
@@ -464,7 +498,6 @@ typedef struct FT_LibraryRec_ {
   FT_Renderer        cur_renderer;     /* current outline renderer */
   FT_Module          auto_hinter;
 
-  #if 0
   FT_DebugHook_Func  debug_hooks[4];
 
 #ifdef FT_CONFIG_OPTION_SUBPIXEL_RENDERING
@@ -473,13 +506,243 @@ typedef struct FT_LibraryRec_ {
 #else
   FT_Vector                lcd_geometry[3];  /* RGB subpixel positions */
 #endif
-  #endif
 
   FT_Int             refcount;
 } FT_LibraryRec;
 
-typedef struct  FT_FaceRec_ {
+typedef struct FT_Bitmap_Size_ {
+  FT_Short  height;
+  FT_Short  width;
 
+  FT_Pos    size;
+
+  FT_Pos    x_ppem;
+  FT_Pos    y_ppem;
+} FT_Bitmap_Size;
+
+#define FT_ENC_TAG( value, a, b, c, d )                             \
+          value = ( ( FT_STATIC_BYTE_CAST( FT_UInt32, a ) << 24 ) | \
+                    ( FT_STATIC_BYTE_CAST( FT_UInt32, b ) << 16 ) | \
+                    ( FT_STATIC_BYTE_CAST( FT_UInt32, c ) <<  8 ) | \
+                      FT_STATIC_BYTE_CAST( FT_UInt32, d )         )
+
+typedef enum FT_Encoding_ {
+  FT_ENC_TAG( FT_ENCODING_NONE, 0, 0, 0, 0 ),
+
+  FT_ENC_TAG( FT_ENCODING_MS_SYMBOL, 's', 'y', 'm', 'b' ),
+  FT_ENC_TAG( FT_ENCODING_UNICODE,   'u', 'n', 'i', 'c' ),
+
+  FT_ENC_TAG( FT_ENCODING_SJIS,    's', 'j', 'i', 's' ),
+  FT_ENC_TAG( FT_ENCODING_PRC,     'g', 'b', ' ', ' ' ),
+  FT_ENC_TAG( FT_ENCODING_BIG5,    'b', 'i', 'g', '5' ),
+  FT_ENC_TAG( FT_ENCODING_WANSUNG, 'w', 'a', 'n', 's' ),
+  FT_ENC_TAG( FT_ENCODING_JOHAB,   'j', 'o', 'h', 'a' ),
+
+  /* for backward compatibility */
+  FT_ENCODING_GB2312     = FT_ENCODING_PRC,
+  FT_ENCODING_MS_SJIS    = FT_ENCODING_SJIS,
+  FT_ENCODING_MS_GB2312  = FT_ENCODING_PRC,
+  FT_ENCODING_MS_BIG5    = FT_ENCODING_BIG5,
+  FT_ENCODING_MS_WANSUNG = FT_ENCODING_WANSUNG,
+  FT_ENCODING_MS_JOHAB   = FT_ENCODING_JOHAB,
+
+  FT_ENC_TAG( FT_ENCODING_ADOBE_STANDARD, 'A', 'D', 'O', 'B' ),
+  FT_ENC_TAG( FT_ENCODING_ADOBE_EXPERT,   'A', 'D', 'B', 'E' ),
+  FT_ENC_TAG( FT_ENCODING_ADOBE_CUSTOM,   'A', 'D', 'B', 'C' ),
+  FT_ENC_TAG( FT_ENCODING_ADOBE_LATIN_1,  'l', 'a', 't', '1' ),
+
+  FT_ENC_TAG( FT_ENCODING_OLD_LATIN_2, 'l', 'a', 't', '2' ),
+
+  FT_ENC_TAG( FT_ENCODING_APPLE_ROMAN, 'a', 'r', 'm', 'n' )
+} FT_Encoding;
+
+typedef struct FT_CharMapRec_ {
+  FT_Face      face;
+  FT_Encoding  encoding;
+  FT_UShort    platform_id;
+  FT_UShort    encoding_id;
+} FT_CharMapRec;
+typedef struct FT_CharMapRec_*  FT_CharMap;
+
+typedef struct FT_Size_Metrics_ {
+  FT_UShort  x_ppem;      /* horizontal pixels per EM               */
+  FT_UShort  y_ppem;      /* vertical pixels per EM                 */
+
+  FT_Fixed   x_scale;     /* scaling values used to convert font    */
+  FT_Fixed   y_scale;     /* units to 26.6 fractional pixels        */
+
+  FT_Pos     ascender;    /* ascender in 26.6 frac. pixels          */
+  FT_Pos     descender;   /* descender in 26.6 frac. pixels         */
+  FT_Pos     height;      /* text height in 26.6 frac. pixels       */
+  FT_Pos     max_advance; /* max horizontal advance, in 26.6 pixels */
+} FT_Size_Metrics;
+
+typedef struct FT_Size_InternalRec_ {
+  void*  module_data;
+  FT_Render_Mode   autohint_mode;
+  FT_Size_Metrics  autohint_metrics;
+} FT_Size_InternalRec;
+typedef struct FT_Size_InternalRec_*  FT_Size_Internal;
+
+typedef struct FT_SizeRec_ {
+  FT_Face           face;      /* parent face object              */
+  FT_Generic        generic;   /* generic pointer for client uses */
+  FT_Size_Metrics   metrics;   /* size metrics                    */
+  FT_Size_Internal  internal;
+} FT_SizeRec;
+typedef struct FT_SizeRec_* FT_Size;
+
+typedef enum FT_Size_Request_Type_ {
+  FT_SIZE_REQUEST_TYPE_NOMINAL,
+  FT_SIZE_REQUEST_TYPE_REAL_DIM,
+  FT_SIZE_REQUEST_TYPE_BBOX,
+  FT_SIZE_REQUEST_TYPE_CELL,
+  FT_SIZE_REQUEST_TYPE_SCALES,
+
+  FT_SIZE_REQUEST_TYPE_MAX
+} FT_Size_Request_Type;
+
+typedef struct FT_Size_RequestRec_ {
+  FT_Size_Request_Type  type;
+  FT_Long               width;
+  FT_Long               height;
+  FT_UInt               horiResolution;
+  FT_UInt               vertResolution;
+} FT_Size_RequestRec;
+typedef struct FT_Size_RequestRec_ *FT_Size_Request;
+
+typedef struct FT_Parameter_ {
+  FT_ULong    tag;
+  FT_Pointer  data;
+} FT_Parameter;
+
+typedef FT_Error
+(*FT_Face_InitFunc)( FT_Stream      stream,
+                     FT_Face        face,
+                     FT_Int         typeface_index,
+                     FT_Int         num_params,
+                     FT_Parameter*  parameters );
+
+typedef void
+(*FT_Face_DoneFunc)( FT_Face  face );
+
+
+typedef FT_Error
+(*FT_Size_InitFunc)( FT_Size  size );
+
+typedef void
+(*FT_Size_DoneFunc)( FT_Size  size );
+
+
+typedef FT_Error
+(*FT_Slot_InitFunc)( FT_GlyphSlot  slot );
+
+typedef void
+(*FT_Slot_DoneFunc)( FT_GlyphSlot  slot );
+
+
+typedef FT_Error
+(*FT_Size_RequestFunc)( FT_Size          size,
+                        FT_Size_Request  req );
+
+typedef FT_Error
+(*FT_Size_SelectFunc)( FT_Size   size,
+                       FT_ULong  size_index );
+
+typedef FT_Error
+(*FT_Slot_LoadFunc)( FT_GlyphSlot  slot,
+                     FT_Size       size,
+                     FT_UInt       glyph_index,
+                     FT_Int32      load_flags );
+
+
+typedef FT_Error
+(*FT_Face_GetKerningFunc)( FT_Face     face,
+                           FT_UInt     left_glyph,
+                           FT_UInt     right_glyph,
+                           FT_Vector*  kerning );
+
+
+typedef FT_Error
+(*FT_Face_AttachFunc)( FT_Face    face,
+                       FT_Stream  stream );
+
+
+typedef FT_Error
+(*FT_Face_GetAdvancesFunc)( FT_Face    face,
+                            FT_UInt    first,
+                            FT_UInt    count,
+                            FT_Int32   flags,
+                            FT_Fixed*  advances );
+
+typedef struct FT_Driver_ClassRec_ {
+  FT_Module_Class          root;
+
+  FT_Long                  face_object_size;
+  FT_Long                  size_object_size;
+  FT_Long                  slot_object_size;
+
+  FT_Face_InitFunc         init_face;
+  FT_Face_DoneFunc         done_face;
+
+  FT_Size_InitFunc         init_size;
+  FT_Size_DoneFunc         done_size;
+
+  FT_Slot_InitFunc         init_slot;
+  FT_Slot_DoneFunc         done_slot;
+
+  FT_Slot_LoadFunc         load_glyph;
+
+  FT_Face_GetKerningFunc   get_kerning;
+  FT_Face_AttachFunc       attach_file;
+  FT_Face_GetAdvancesFunc  get_advances;
+
+  /* since version 2.2 */
+  FT_Size_RequestFunc      request_size;
+  FT_Size_SelectFunc       select_size;
+} FT_Driver_ClassRec, *FT_Driver_Class;
+
+typedef struct FT_DriverRec_ {
+  FT_ModuleRec     root;
+  FT_Driver_Class  clazz;
+  FT_ListRec       faces_list;
+  FT_GlyphLoader   glyph_loader;
+} FT_DriverRec;
+typedef struct FT_DriverRec_*  FT_Driver;
+
+typedef struct FT_ServiceCacheRec_ {
+  FT_Pointer  service_POSTSCRIPT_FONT_NAME;
+  FT_Pointer  service_MULTI_MASTERS;
+  FT_Pointer  service_METRICS_VARIATIONS;
+  FT_Pointer  service_GLYPH_DICT;
+  FT_Pointer  service_PFR_METRICS;
+  FT_Pointer  service_WINFNT;
+} FT_ServiceCacheRec, *FT_ServiceCache;
+
+typedef struct FT_Face_InternalRec_ {
+  FT_Matrix  transform_matrix;
+  FT_Vector  transform_delta;
+  FT_Int     transform_flags;
+
+  FT_ServiceCacheRec  services;
+
+#ifdef FT_CONFIG_OPTION_INCREMENTAL
+  FT_Incremental_InterfaceRec*  incremental_interface;
+#endif
+
+  FT_Char              no_stem_darkening;
+  FT_Int32             random_seed;
+
+#ifdef FT_CONFIG_OPTION_SUBPIXEL_RENDERING
+  FT_LcdFiveTapFilter      lcd_weights;      /* filter weights, if any */
+  FT_Bitmap_LcdFilterFunc  lcd_filter_func;  /* filtering callback     */
+#endif
+
+  FT_Int  refcount;
+} FT_Face_InternalRec;
+typedef struct FT_Face_InternalRec_* FT_Face_Internal;
+
+typedef struct  FT_FaceRec_ {
   FT_Long           num_faces;
   FT_Long           face_index;
 
@@ -492,7 +755,6 @@ typedef struct  FT_FaceRec_ {
   FT_String*        style_name;
 
   FT_Int            num_fixed_sizes;
-  #if 0
   FT_Bitmap_Size*   available_sizes;
 
   FT_Int            num_charmaps;
@@ -532,9 +794,7 @@ typedef struct  FT_FaceRec_ {
   void*             extensions; /* unused                         */
 
   FT_Face_Internal  internal;
-
   /*@private end */
-  #endif
 } FT_FaceRec;
 
 typedef struct  FT_Open_Args_ {
@@ -545,9 +805,7 @@ typedef struct  FT_Open_Args_ {
   FT_Stream       stream;
   FT_Module       driver;
   FT_Int          num_params;
-  #if 0
   FT_Parameter*   params;
-  #endif
 } FT_Open_Args;
 
 static FT_Error
