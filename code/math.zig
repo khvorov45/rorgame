@@ -1,7 +1,7 @@
 fn V2(comptime T: type) type {
     return struct {
-        x: T,
-        y: T,
+        x: T = 0,
+        y: T = 0,
 
         pub fn max(self: @This(), other: @This()) @This() {
             return @This(){ .x = @maximum(self.x, other.x), .y = @maximum(self.y, other.y) };
@@ -49,8 +49,8 @@ pub const V2f = V2(f32);
 
 fn Rect2(comptime T: type) type {
     return struct {
-        topleft: T,
-        dim: T,
+        topleft: T = T{},
+        dim: T = T{},
 
         pub fn bottomright(rect: @This()) T {
             return rect.topleft.add(rect.dim);

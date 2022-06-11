@@ -6,7 +6,8 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const freetype = b.addStaticLibrary("freetype", null);
-    freetype.addSystemIncludePath("code/freetype/include");
+    const freetype_include_path = "code/freetype/include";
+    freetype.addSystemIncludePath(freetype_include_path);
 
     // "-DFT_CONFIG_STANDARD_LIBRARY_H=<freetype/config/ftstdlib_nocrt.h>"
     const freetype_files = [_][]const u8{
@@ -66,13 +67,14 @@ pub fn build(b: *std.build.Builder) void {
         "pshinter/pshinter.c",
         "psnames/psnames.c",
     };
-    const freetype_flags = &[_][]const u8{"-g", "-O0", "-DFT2_BUILD_LIBRARY"};
+    const freetype_flags = &[_][]const u8{ "-g", "-O0", "-DFT2_BUILD_LIBRARY" };
     inline for (freetype_files) |file| {
         freetype.addCSourceFile("code/freetype/src/" ++ file, freetype_flags);
     }
     freetype.linkLibC();
 
     const exe = b.addExecutable("rorgame", "code/rorgame.zig");
+    exe.addSystemIncludePath(freetype_include_path); // NOTE(khvorov) For bindings
     exe.linkLibrary(freetype);
     exe.subsystem = .Windows;
     exe.setTarget(target);
