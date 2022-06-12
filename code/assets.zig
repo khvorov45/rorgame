@@ -1,5 +1,6 @@
 const std = @import("std");
 const panic = std.debug.panic;
+const EnumArray = std.enums.EnumArray;
 
 const mem = @import("mem.zig");
 const math = @import("math.zig");
@@ -12,6 +13,12 @@ const ft = @import("freetype/freetype_bindings.zig");
 pub const Texture = struct {
     pixels: []u32,
     dim: math.V2i,
+};
+
+pub const TextureGroupID = enum {
+    commando_idle,
+    commando_walk,
+    commando_use_skill1,
 };
 
 pub const GlyphInfo = struct {
@@ -49,6 +56,7 @@ pub const Expandable = struct {
 
 pub const Assets = struct {
     atlas: Texture,
+    texture_groups: EnumArray(TextureGroupID, []math.Rect2f),
 
     pub fn fromSources(allocator: mem.Allocator) !Assets {
         var atlas_dim_builder = Expandable{};
@@ -57,20 +65,21 @@ pub const Assets = struct {
         // SECTION Bitmaps
         //
 
-        const bitmap_files = [_][]const u8{ "commando.ase", "commando_shoot.ase", "commando_walk.ase" };
+        const texture_groups_fields = @typeInfo(TextureGroupID).Enum.fields;
+        var filled_rects: [texture_groups_fields.len][]math.Rect2i = undefined;
+        var future_atlas_topleft: [texture_groups_fields.len][]math.V2i = undefined;
+        var textures: [texture_groups_fields.len][]Texture = undefined;
+        var total_rects: i32 = 0;
 
-        var filled_rects: [bitmap_files.len][]math.Rect2i = undefined;
-        var future_atlas_topleft: [bitmap_files.len][]math.V2i = undefined;
-        var textures: [bitmap_files.len][]Texture = undefined;
-
-        inline for (bitmap_files) |file, file_index| {
-            const ase_file = try fs.readEntireFile("assets/" ++ file, allocator);
+        inline for (texture_groups_fields) |tex_group_info, tex_group_index| {
+            const ase_file = try fs.readEntireFile("assets/" ++ tex_group_info.name ++ ".ase", allocator);
             const file_textures = try ase.parse(ase_file, allocator);
-            textures[file_index] = file_textures;
-            filled_rects[file_index] = try allocator.alloc(math.Rect2i, file_textures.len);
-            future_atlas_topleft[file_index] = try allocator.alloc(math.V2i, file_textures.len);
+            textures[tex_group_index] = file_textures;
+            filled_rects[tex_group_index] = try allocator.alloc(math.Rect2i, file_textures.len);
+            future_atlas_topleft[tex_group_index] = try allocator.alloc(math.V2i, file_textures.len);
+            total_rects += @intCast(i32, file_textures.len);
 
-            for (file_textures) |texture, file_texture_index| {
+            for (file_textures) |texture, tex_index| {
                 const filled_rect = fr: {
                     var first_filled_col = texture.dim.x;
                     var first_filled_row = texture.dim.y;
@@ -81,8 +90,8 @@ pub const Assets = struct {
                     while (row < texture.dim.y) : (row += 1) {
                         var col: i32 = 0;
                         while (col < texture.dim.x) : (col += 1) {
-                            const tex_index = row * texture.dim.x + col;
-                            if (texture.pixels[@intCast(usize, tex_index)] != 0) {
+                            const texel_index = row * texture.dim.x + col;
+                            if (texture.pixels[@intCast(usize, texel_index)] != 0) {
                                 first_filled_col = @minimum(first_filled_col, col);
                                 first_filled_row = @minimum(first_filled_row, row);
                                 last_filled_col = @maximum(last_filled_col, col);
@@ -97,10 +106,10 @@ pub const Assets = struct {
                     };
                 };
 
-                filled_rects[file_index][file_texture_index] = filled_rect;
+                filled_rects[tex_group_index][tex_index] = filled_rect;
 
                 const builder_topleft = atlas_dim_builder.addToLine(filled_rect.dim.add(math.V2i{ .x = 2, .y = 2 }));
-                future_atlas_topleft[file_index][file_texture_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
+                future_atlas_topleft[tex_group_index][tex_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
             }
 
             atlas_dim_builder.nextLine();
@@ -145,10 +154,22 @@ pub const Assets = struct {
             px.* = 0;
         }
 
-        for (filled_rects) |file_filled_rects, file_index| {
-            for (file_filled_rects) |filled_rect, rect_index| {
-                const atlas_topleft = future_atlas_topleft[file_index][rect_index];
-                const texture = textures[file_index][rect_index];
+        var texture_groups: EnumArray(TextureGroupID, []math.Rect2f) = undefined;
+        var tex_rects = try allocator.alloc(math.Rect2f, @intCast(usize, total_rects));
+
+        inline for (texture_groups_fields) |tex_group_info, tex_group_index| {
+
+            _ = tex_group_info;
+            const tex_group_filled_rects = filled_rects[tex_group_index];
+            const tex_group_atlas_rects = tex_rects[0..tex_group_filled_rects.len];
+            tex_rects = tex_rects[tex_group_filled_rects.len..];
+            texture_groups.set(@intToEnum(TextureGroupID, tex_group_info.value), tex_group_atlas_rects);
+
+            for (tex_group_filled_rects) |filled_rect, rect_index| {
+                const atlas_topleft = future_atlas_topleft[tex_group_index][rect_index];
+                const texture = textures[tex_group_index][rect_index];
+
+                tex_group_atlas_rects[rect_index] = math.Rect2f{.topleft = atlas_topleft.to(math.V2f), .dim = filled_rect.dim.to(math.V2f)};
 
                 var row: i32 = filled_rect.topleft.y;
                 while (row < filled_rect.topleft.y + filled_rect.dim.y) : (row += 1) {
@@ -169,6 +190,7 @@ pub const Assets = struct {
 
         const result = Assets{
             .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim },
+            .texture_groups = texture_groups,
         };
         return result;
     }
