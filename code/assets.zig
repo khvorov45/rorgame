@@ -120,30 +120,33 @@ pub const Assets = struct {
         // SECTION Fonts
         //
 
-        // const firstchar = ' ';
-        // const char_count = '~' - firstchar + 1;
-        // const alphamap_glyphs = make([]GlyphInfo, char_count, font_allocator),
+        // TODO(khvorov) Bring fonts over to a separate (alpha-only) atlas
 
-        // var ft_lib: ft.FT_Library = undefined;
-        // _ = ft.FT_Init_FreeType(&ft_lib);
+        const firstchar = ' ';
+        const char_count = '~' - firstchar + 1;
 
-        // const font_file_data = try fs.readEntireFile("assets/LiberationMono-Regular.ttf", allocator);
+        var ft_lib: ft.FT_Library = undefined;
+        _ = ft.FT_Init_FreeType(&ft_lib);
 
-        // var ft_face: ft.FT_Face = undefined;
-        // _ = ft.FT_New_Memory_Face(ft_lib, font_file_data.ptr, @intCast(c_long, font_file_data.len), 0, &ft_face);
+        const font_file_data = try fs.readEntireFile("assets/LiberationMono-Regular.ttf", allocator);
 
-        // const px_height_font = 14;
-        // _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
+        var ft_face: ft.FT_Face = undefined;
+        _ = ft.FT_New_Memory_Face(ft_lib, font_file_data.ptr, @intCast(c_long, font_file_data.len), 0, &ft_face);
 
-        // var req_font_atlas_size: i32 = 0;
-        // for ch_index in 0..<char_count {
-        //     loadAndRenderFTBitmap(firstchar, ch_index, ft_face)
-        //     const bm = ft_face.glyph.bitmap
-        //     req_font_atlas_size += bm.width * bm.rows
-        // }
+        const px_height_font = 28;
+        _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
+
+        {
+            var ch_index: usize = 0;
+            while (ch_index < char_count) : (ch_index += 1) {
+                loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
+                const bm = ft_face.*.glyph.*.bitmap;
+                total_atlas_area += @intCast(i32, (bm.width + 2) * (bm.rows + 2));
+            }
+        }
 
         //
-        // SECTION Atlas
+        // SECTION Atlas size
         //
 
         const areaFudge = 1.5;
@@ -159,6 +162,22 @@ pub const Assets = struct {
                 future_atlas_topleft[tex_group_index][rect_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
             }
         }
+
+        var future_atlas_chars_topleft = try allocator.alloc(math.V2i, char_count);
+        {
+            var ch_index: usize = 0;
+            while (ch_index < char_count) : (ch_index += 1) {
+                loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
+                const bm = ft_face.*.glyph.*.bitmap;
+                const char_dim = math.V2i{.x = @intCast(i32, bm.width), .y = @intCast(i32, bm.rows)};
+                const builder_topleft = atlas_dim_builder.add(char_dim.add(math.V2i{ .x = 2, .y = 2 }));
+                future_atlas_chars_topleft[ch_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
+            }
+        }
+
+        //
+        // SECTION Atlas
+        //
 
         const atlas_dim = math.V2i{ .x = atlas_dim_builder.width, .y = atlas_dim_builder.height };
         const atlas_pixels = try allocator.alloc(
@@ -202,6 +221,27 @@ pub const Assets = struct {
             }
         }
 
+        for (future_atlas_chars_topleft) |atlas_topleft, ch_index| {
+            loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
+            const bm = ft_face.*.glyph.*.bitmap;
+
+            var row: i32 = 0;
+            while (row < @intCast(i32, bm.rows)) : (row += 1) {
+                const atlas_row = row + atlas_topleft.y;
+
+                var col: i32 = 0;
+                while (col < @intCast(i32, bm.width)) : (col += 1) {
+                    const atlas_col = col + atlas_topleft.x;
+                    const tex_index = row * bm.pitch + col;
+                    const atlas_index = atlas_row * atlas_dim.x + atlas_col;
+
+                    const alpha = bm.buffer[@intCast(usize, tex_index)];
+                    const color = (@intCast(u32, alpha) << 24) | 0x00FFFFFF;
+                    atlas_pixels[@intCast(usize, atlas_index)] = color;
+                }
+            }
+        }
+
         const result = Assets{
             .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim },
             .texture_groups = texture_groups,
@@ -209,12 +249,12 @@ pub const Assets = struct {
         return result;
     }
 
-    fn loadAndRenderFTBitmap(firstchar: u32, ch_index: i32, ft_face: ft.Face) void {
+    fn loadAndRenderFTBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face) void {
         const ch = firstchar + @intCast(u32, ch_index);
         const ft_glyph_index = ft.FT_Get_Char_Index(ft_face, ch);
-        ft.FT_Load_Glyph(ft_face, ft_glyph_index, ft.FT_LOAD_DEFAULT);
-        if (ft_face.glyph.format != ft.FT_Glyph_Format.BITMAP) {
-            _ = ft.FT_Render_Glyph(ft_face.glyph, ft.Render_Mode.NORMAL);
+        _ = ft.FT_Load_Glyph(ft_face, ft_glyph_index, ft.FT_LOAD_DEFAULT);
+        if (ft_face.*.glyph.*.format != ft.FT_GLYPH_FORMAT_BITMAP) {
+            _ = ft.FT_Render_Glyph(ft_face.*.glyph, ft.FT_RENDER_MODE_NORMAL);
         }
     }
 };

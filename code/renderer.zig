@@ -90,6 +90,9 @@ pub const Renderer = struct {
         }
     }
 
+    // TODO(khvorov) Draw rect with a texture with nearest sampling
+    // TODO(khvorov) Probably also a plain draw rect with no textures as a separate proc
+
     pub fn drawRectOutline(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
         const thickness = 1;
 
