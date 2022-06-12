@@ -1,5 +1,6 @@
 const std = @import("std");
 const panic = std.debug.panic;
+const assert = std.debug.assert;
 const EnumArray = std.enums.EnumArray;
 
 const mem = @import("mem.zig");
@@ -35,22 +36,28 @@ pub const Font = struct {
 };
 
 pub const Expandable = struct {
-    dim: math.V2i = math.V2i{},
-    current_topleft: math.V2i = math.V2i{},
+    width: i32,
+    height: i32 = 0,
+    current: math.V2i = math.V2i{},
+    tallest_on_line: i32 = 0,
 
-    pub fn addToLine(self: *Expandable, dim: math.V2i) math.V2i {
-        const lack = dim.sub((self.dim.sub(self.current_topleft))).max(math.V2i{ .x = 0, .y = 0 });
-        self.dim = self.dim.add(lack);
+    pub fn add(self: *Expandable, dim: math.V2i) math.V2i {
+        const width_left = self.width - self.current.x;
 
-        const topleft = self.current_topleft;
-        self.current_topleft.x += dim.x;
+        if (dim.x > width_left) {
+            assert(dim.x <= self.width);
+            self.current.x = 0;
+            self.current.y += self.tallest_on_line;
+            self.tallest_on_line = 0;
+        }
+
+        const topleft = self.current;
+        self.current.x += dim.x;
+        const prev_tallest = self.tallest_on_line;
+        self.tallest_on_line = @maximum(self.tallest_on_line, dim.y);
+        self.height += @maximum(self.tallest_on_line - prev_tallest, 0);
 
         return topleft;
-    }
-
-    pub fn nextLine(self: *Expandable) void {
-        self.current_topleft.x = 0;
-        self.current_topleft.y = self.dim.y;
     }
 };
 
@@ -59,7 +66,6 @@ pub const Assets = struct {
     texture_groups: EnumArray(TextureGroupID, []math.Rect2f),
 
     pub fn fromSources(allocator: mem.Allocator) !Assets {
-        var atlas_dim_builder = Expandable{};
 
         //
         // SECTION Bitmaps
@@ -67,16 +73,15 @@ pub const Assets = struct {
 
         const texture_groups_fields = @typeInfo(TextureGroupID).Enum.fields;
         var filled_rects: [texture_groups_fields.len][]math.Rect2i = undefined;
-        var future_atlas_topleft: [texture_groups_fields.len][]math.V2i = undefined;
         var textures: [texture_groups_fields.len][]Texture = undefined;
         var total_rects: i32 = 0;
+        var total_atlas_area: i32 = 0;
 
         inline for (texture_groups_fields) |tex_group_info, tex_group_index| {
             const ase_file = try fs.readEntireFile("assets/" ++ tex_group_info.name ++ ".ase", allocator);
             const file_textures = try ase.parse(ase_file, allocator);
             textures[tex_group_index] = file_textures;
             filled_rects[tex_group_index] = try allocator.alloc(math.Rect2i, file_textures.len);
-            future_atlas_topleft[tex_group_index] = try allocator.alloc(math.V2i, file_textures.len);
             total_rects += @intCast(i32, file_textures.len);
 
             for (file_textures) |texture, tex_index| {
@@ -107,12 +112,8 @@ pub const Assets = struct {
                 };
 
                 filled_rects[tex_group_index][tex_index] = filled_rect;
-
-                const builder_topleft = atlas_dim_builder.addToLine(filled_rect.dim.add(math.V2i{ .x = 2, .y = 2 }));
-                future_atlas_topleft[tex_group_index][tex_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
+                total_atlas_area += (filled_rect.dim.x + 2) * (filled_rect.dim.y + 2);
             }
-
-            atlas_dim_builder.nextLine();
         }
 
         //
@@ -145,7 +146,21 @@ pub const Assets = struct {
         // SECTION Atlas
         //
 
-        const atlas_dim = atlas_dim_builder.dim;
+        const areaFudge = 1.5;
+        var atlas_dim_builder = Expandable{ .width = @floatToInt(i32, @sqrt(@intToFloat(f32, total_atlas_area) * areaFudge)) };
+        var future_atlas_topleft: [texture_groups_fields.len][]math.V2i = undefined;
+
+        inline for (texture_groups_fields) |tex_group_info, tex_group_index| {
+            _ = tex_group_info;
+            const tex_group_filled_rects = filled_rects[tex_group_index];
+            future_atlas_topleft[tex_group_index] = try allocator.alloc(math.V2i, tex_group_filled_rects.len);
+            for (tex_group_filled_rects) |filled_rect, rect_index| {
+                const builder_topleft = atlas_dim_builder.add(filled_rect.dim.add(math.V2i{ .x = 2, .y = 2 }));
+                future_atlas_topleft[tex_group_index][rect_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
+            }
+        }
+
+        const atlas_dim = math.V2i{ .x = atlas_dim_builder.width, .y = atlas_dim_builder.height };
         const atlas_pixels = try allocator.alloc(
             u32,
             @intCast(usize, atlas_dim.x * atlas_dim.y),
@@ -158,7 +173,6 @@ pub const Assets = struct {
         var tex_rects = try allocator.alloc(math.Rect2f, @intCast(usize, total_rects));
 
         inline for (texture_groups_fields) |tex_group_info, tex_group_index| {
-
             _ = tex_group_info;
             const tex_group_filled_rects = filled_rects[tex_group_index];
             const tex_group_atlas_rects = tex_rects[0..tex_group_filled_rects.len];
@@ -169,7 +183,7 @@ pub const Assets = struct {
                 const atlas_topleft = future_atlas_topleft[tex_group_index][rect_index];
                 const texture = textures[tex_group_index][rect_index];
 
-                tex_group_atlas_rects[rect_index] = math.Rect2f{.topleft = atlas_topleft.to(math.V2f), .dim = filled_rect.dim.to(math.V2f)};
+                tex_group_atlas_rects[rect_index] = math.Rect2f{ .topleft = atlas_topleft.to(math.V2f), .dim = filled_rect.dim.to(math.V2f) };
 
                 var row: i32 = filled_rect.topleft.y;
                 while (row < filled_rect.topleft.y + filled_rect.dim.y) : (row += 1) {

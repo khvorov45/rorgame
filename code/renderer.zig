@@ -89,4 +89,18 @@ pub const Renderer = struct {
             }
         }
     }
+
+    pub fn drawRectOutline(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
+        const thickness = 1;
+
+        const top = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = rect.dim.x, .y = thickness } };
+        const bottom = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x, .y = rect.topleft.y + rect.dim.y - thickness }, .dim = top.dim };
+        const left = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = thickness, .y = rect.dim.y } };
+        const right = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x + rect.dim.x - thickness, .y = rect.topleft.y }, .dim = left.dim };
+
+        renderer.drawRect(top, color, null);
+        renderer.drawRect(bottom, color, null);
+        renderer.drawRect(left, color, null);
+        renderer.drawRect(right, color, null);
+    }
 };
