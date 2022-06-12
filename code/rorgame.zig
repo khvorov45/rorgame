@@ -76,13 +76,7 @@ pub fn main() !void {
         const whole_atlas = math.Rect2f{ .topleft = math.V2f{ .x = 1, .y = 1 }, .dim = assets.atlas.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f) };
 
         renderer.drawRect(
-            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = whole_atlas.dim.mulf(10) },
-            math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
-            whole_atlas,
-        );
-
-        renderer.drawRect(
-            math.Rect2f{ .topleft = math.V2f{ .x = @round(rect_topleft_x), .y = @round(rect_topleft_y + whole_atlas.dim.y * 10 + 10) }, .dim = whole_atlas.dim.mulf(10) },
+            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = whole_atlas.dim.mulf(5) },
             math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
             whole_atlas,
         );

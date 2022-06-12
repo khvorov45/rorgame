@@ -29,19 +29,21 @@ pub const Font = struct {
 
 pub const Expandable = struct {
     dim: math.V2i = math.V2i{},
-    free: math.Rect2i = math.Rect2i{},
+    current_topleft: math.V2i = math.V2i{},
 
-    pub fn accomodate(self: *Expandable, dim: math.V2i) math.V2i {
-        // TODO(khvorov) An actual version of this
-        const topleft = self.free.topleft;
-
-        const lack = dim.sub(self.free.dim).max(math.V2i{ .x = 0, .y = 0 });
+    pub fn addToLine(self: *Expandable, dim: math.V2i) math.V2i {
+        const lack = dim.sub((self.dim.sub(self.current_topleft))).max(math.V2i{ .x = 0, .y = 0 });
         self.dim = self.dim.add(lack);
-        self.free.dim = self.free.dim.add(lack);
-        self.free.topleft.x += dim.x;
-        self.free.dim.x -= dim.x;
+
+        const topleft = self.current_topleft;
+        self.current_topleft.x += dim.x;
 
         return topleft;
+    }
+
+    pub fn nextLine(self: *Expandable) void {
+        self.current_topleft.x = 0;
+        self.current_topleft.y = self.dim.y;
     }
 };
 
@@ -55,14 +57,14 @@ pub const Assets = struct {
         // SECTION Bitmaps
         //
 
-        const bitmap_files = [_][]const u8{"assets/commando.ase"};
+        const bitmap_files = [_][]const u8{ "commando.ase", "commando_shoot.ase", "commando_walk.ase" };
 
         var filled_rects: [bitmap_files.len][]math.Rect2i = undefined;
         var future_atlas_topleft: [bitmap_files.len][]math.V2i = undefined;
         var textures: [bitmap_files.len][]Texture = undefined;
 
         inline for (bitmap_files) |file, file_index| {
-            const ase_file = try fs.readEntireFile(file, allocator);
+            const ase_file = try fs.readEntireFile("assets/" ++ file, allocator);
             const file_textures = try ase.parse(ase_file, allocator);
             textures[file_index] = file_textures;
             filled_rects[file_index] = try allocator.alloc(math.Rect2i, file_textures.len);
@@ -96,8 +98,12 @@ pub const Assets = struct {
                 };
 
                 filled_rects[file_index][file_texture_index] = filled_rect;
-                future_atlas_topleft[file_index][file_texture_index] = atlas_dim_builder.accomodate(filled_rect.dim);
+
+                const builder_topleft = atlas_dim_builder.addToLine(filled_rect.dim.add(math.V2i{ .x = 2, .y = 2 }));
+                future_atlas_topleft[file_index][file_texture_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
             }
+
+            atlas_dim_builder.nextLine();
         }
 
         //
@@ -130,7 +136,7 @@ pub const Assets = struct {
         // SECTION Atlas
         //
 
-        const atlas_dim = atlas_dim_builder.dim.add(math.V2i{ .x = 2, .y = 2 });
+        const atlas_dim = atlas_dim_builder.dim;
         const atlas_pixels = try allocator.alloc(
             u32,
             @intCast(usize, atlas_dim.x * atlas_dim.y),
@@ -146,11 +152,11 @@ pub const Assets = struct {
 
                 var row: i32 = filled_rect.topleft.y;
                 while (row < filled_rect.topleft.y + filled_rect.dim.y) : (row += 1) {
-                    const atlas_row = 1 + (row - filled_rect.topleft.y) + atlas_topleft.y;
+                    const atlas_row = (row - filled_rect.topleft.y) + atlas_topleft.y;
 
                     var col: i32 = filled_rect.topleft.x;
                     while (col < filled_rect.topleft.x + filled_rect.dim.x) : (col += 1) {
-                        const atlas_col = 1 + (col - filled_rect.topleft.x) + atlas_topleft.x;
+                        const atlas_col = (col - filled_rect.topleft.x) + atlas_topleft.x;
                         const tex_index = row * texture.dim.x + col;
                         const atlas_index = atlas_row * atlas_dim.x + atlas_col;
 
