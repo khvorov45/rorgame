@@ -31,7 +31,7 @@ pub fn main() !void {
     const assets_arena_allocator = assets_arena.allocator();
     var assets = try Assets.fromSources(assets_arena_allocator);
 
-    var renderer = try rdr.Renderer.new(window.dim, assets.atlas, virtual_arena_allocator);
+    var renderer = try rdr.Renderer.new(window.dim, assets.atlas, assets.fonts, virtual_arena_allocator);
 
     var input = Input.new();
 
@@ -66,8 +66,8 @@ pub fn main() !void {
             rect_topleft_x += 0.5;
         }
 
-        rect_topleft_x += 0;
-        rect_topleft_y += 0;
+        rect_topleft_x += 0.0;
+        rect_topleft_y += 0.0;
 
         //
         // SECTION Render
@@ -93,6 +93,24 @@ pub fn main() !void {
             );
 
             renderer.drawRectOutline(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
+
+            const whole_font_atlas = math.Rect2f{
+                .topleft = math.V2f{ .x = 1, .y = 1 },
+                .dim = assets.fonts.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
+            };
+
+            const screen_rect_fonts = math.Rect2f{
+                .topleft = math.V2f{ .x = screen_rect.topleft.x + screen_rect.dim.x + 20, .y = screen_rect.topleft.y },
+                .dim = whole_font_atlas.dim,
+            };
+
+            renderer.drawRectAlpha(
+                screen_rect_fonts,
+                math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+                whole_font_atlas,
+            );
+
+            renderer.drawRectOutline(screen_rect_fonts, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
         } else {
             const req_group = assets.texture_groups.get(.commando_walk);
             const req_tex = req_group[frame_index];

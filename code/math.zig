@@ -112,6 +112,11 @@ pub const Color = struct {
         };
         return result;
     }
+
+    pub fn lerp(start: Color, from_start: f32, end: Color) Color {
+        const result = start.mul(1 - from_start).add(end.mul(from_start));
+        return result;
+    }
 };
 
 fn safeRatio0(v1: f32, v2: f32) f32 {
