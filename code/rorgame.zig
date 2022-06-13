@@ -86,11 +86,7 @@ pub fn main() !void {
                 .dim = whole_atlas.dim.mulf(5),
             };
 
-            renderer.drawRect(
-                screen_rect,
-                math.Color{ .r = 0, .g = 1, .b = 1, .a = 1 },
-                whole_atlas,
-            );
+            renderer.drawRectTex(screen_rect, whole_atlas);
 
             renderer.drawRectOutline(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
 
@@ -118,7 +114,7 @@ pub fn main() !void {
             temp_frame_index = (temp_frame_index + 1) % (req_group.len * temp_factor);
             frame_index = temp_frame_index / temp_factor;
 
-            renderer.drawRect(
+            renderer.drawRectTex(
                 math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = req_tex.dim.mulf(5) },
                 math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
                 req_tex,
