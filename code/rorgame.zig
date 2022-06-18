@@ -31,7 +31,7 @@ pub fn main() !void {
     const assets_arena_allocator = assets_arena.allocator();
     var assets = try Assets.fromSources(assets_arena_allocator);
 
-    var renderer = try rdr.Renderer.new(window.dim, assets.atlas, assets.fonts, virtual_arena_allocator);
+    var renderer = try rdr.Renderer.new(window.dim, assets.atlas, &assets.font, virtual_arena_allocator);
 
     var input = Input.new();
 
@@ -75,7 +75,7 @@ pub fn main() !void {
 
         renderer.clearBuffers();
 
-        if (true) {
+        if (false) {
             const whole_atlas = math.Rect2f{
                 .topleft = math.V2f{ .x = 1, .y = 1 },
                 .dim = assets.atlas.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
@@ -116,9 +116,11 @@ pub fn main() !void {
 
             renderer.drawRectTex(
                 math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = req_tex.dim.mulf(5) },
-                math.Color{ .r = 1, .g = 0, .b = 0, .a = 1 },
                 req_tex,
             );
+
+            const text = "test";
+            renderer.drawTextline(text, math.V2f{.x = 0, .y = 100}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
         }
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);

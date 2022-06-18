@@ -61,6 +61,13 @@ fn Rect2(comptime T: type) type {
             const result_bottomright = rect.bottomright().min(clip.bottomright());
             return @This(){ .topleft = result_topleft, .dim = result_bottomright.sub(result_topleft) };
         }
+
+        pub fn to(self: @This(), comptime Target: type) Target {
+            switch (Target) {
+                Rect2f => return Target{ .topleft = self.topleft.to(V2f), .dim = self.dim.to(V2f) },
+                else => @compileError("wrong conversion"),
+            }
+        }
     };
 }
 

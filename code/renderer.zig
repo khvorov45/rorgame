@@ -1,23 +1,27 @@
-const panic = @import("std").debug.panic;
+const std = @import("std");
+const unicode = std.unicode;
+const panic = std.debug.panic;
 
 const math = @import("math.zig");
 const mem = @import("mem.zig");
+const log = @import("log.zig");
 
 const assets = @import("assets.zig");
 const Texture = assets.Texture;
 const TextureAlpha = assets.TextureAlpha;
+const Font = assets.Font;
 
 pub const Renderer = struct {
     draw_buffer: Texture,
     atlas: Texture,
-    atlas_alpha: TextureAlpha,
+    font: *const Font,
 
-    pub fn new(dim: math.V2i, atlas: Texture, atlas_alpha: TextureAlpha, allocator: mem.Allocator) !Renderer {
+    pub fn new(dim: math.V2i, atlas: Texture, font: *const Font, allocator: mem.Allocator) !Renderer {
         const draw_buf = Texture{
             .pixels = try allocator.alloc(u32, @intCast(usize, dim.x * dim.y)),
             .dim = dim,
         };
-        return Renderer{ .draw_buffer = draw_buf, .atlas = atlas, .atlas_alpha = atlas_alpha };
+        return Renderer{ .draw_buffer = draw_buf, .atlas = atlas, .font = font };
     }
 
     pub fn clearBuffers(renderer: *Renderer) void {
@@ -127,6 +131,8 @@ pub const Renderer = struct {
         const topleft_aligned = rect_clipped.topleft.floor();
         const bottomright_aligned = bottomright.ceil();
 
+        const atlas_alpha = renderer.font.alphamap;
+
         var row = @floatToInt(i32, topleft_aligned.y);
         while (row < @floatToInt(i32, bottomright_aligned.y)) : (row += 1) {
             var col = @floatToInt(i32, topleft_aligned.x);
@@ -146,15 +152,15 @@ pub const Renderer = struct {
                 const tex_from_left = tex_colf - @floor(tex_colf);
                 const tex_from_top = tex_rowf - @floor(tex_rowf);
 
-                const tex_index_topleft = @intCast(usize, tex_row_top * renderer.atlas_alpha.dim.x + tex_col_left);
-                const tex_index_topright = @intCast(usize, tex_row_top * renderer.atlas_alpha.dim.x + tex_col_right);
-                const tex_index_bottomleft = @intCast(usize, tex_row_bottom * renderer.atlas_alpha.dim.x + tex_col_left);
-                const tex_index_bottomright = @intCast(usize, tex_row_bottom * renderer.atlas_alpha.dim.x + tex_col_right);
+                const tex_index_topleft = @intCast(usize, tex_row_top * atlas_alpha.dim.x + tex_col_left);
+                const tex_index_topright = @intCast(usize, tex_row_top * atlas_alpha.dim.x + tex_col_right);
+                const tex_index_bottomleft = @intCast(usize, tex_row_bottom * atlas_alpha.dim.x + tex_col_left);
+                const tex_index_bottomright = @intCast(usize, tex_row_bottom * atlas_alpha.dim.x + tex_col_right);
 
-                const texel_topleft_u8 = renderer.atlas_alpha.alpha[tex_index_topleft];
-                const texel_topright_u8 = renderer.atlas_alpha.alpha[tex_index_topright];
-                const texel_bottomleft_u8 = renderer.atlas_alpha.alpha[tex_index_bottomleft];
-                const texel_bottomright_u8 = renderer.atlas_alpha.alpha[tex_index_bottomright];
+                const texel_topleft_u8 = atlas_alpha.alpha[tex_index_topleft];
+                const texel_topright_u8 = atlas_alpha.alpha[tex_index_topright];
+                const texel_bottomleft_u8 = atlas_alpha.alpha[tex_index_bottomleft];
+                const texel_bottomright_u8 = atlas_alpha.alpha[tex_index_bottomright];
 
                 const texel_topleft = math.Color{ .r = color.r, .g = color.g, .b = color.b, .a = @intToFloat(f32, texel_topleft_u8) / 255 * color.a };
                 const texel_topright = math.Color{ .r = color.r, .g = color.g, .b = color.b, .a = @intToFloat(f32, texel_topright_u8) / 255 * color.a };
@@ -187,5 +193,23 @@ pub const Renderer = struct {
         renderer.drawRect(bottom, color);
         renderer.drawRect(left, color);
         renderer.drawRect(right, color);
+    }
+
+    pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
+        const glyph_info = renderer.font.getGlyphInfo(glyph);
+        const glyph_screen_rect = math.Rect2f{.topleft = topleft.add(glyph_info.offset.to(math.V2f)), .dim = glyph_info.coords.dim.to(math.V2f)};
+        const glyph_tex_rect = glyph_info.coords.to(math.Rect2f);
+        renderer.drawRectAlpha(glyph_screen_rect, color, glyph_tex_rect);
+        return glyph_info.advance_x;
+    }
+
+    pub fn drawTextline(renderer: *Renderer, text: []const u8, topleft_init: math.V2f, color: math.Color) void {
+        var topleft_current = topleft_init;
+        var utf8_view = unicode.Utf8View.init(text) catch unreachable;
+        var utf8 = utf8_view.iterator() ;
+        while (utf8.nextCodepoint()) |codepoint| {
+            const glyph_advance_x = renderer.drawGlyph(codepoint, topleft_current, color);
+            topleft_current.x += @intToFloat(f32, glyph_advance_x);
+        }
     }
 };

@@ -30,14 +30,21 @@ pub const TextureGroupID = enum {
 pub const GlyphInfo = struct {
     coords: math.Rect2i,
     advance_x: i32,
+    offset: math.V2i,
 };
 
 pub const Font = struct {
     px_height_font: i32,
     px_height_line: i32,
-    alphamap: []u8,
-    alphamap_glyphs: []GlyphInfo,
-    firstchar: u32,
+    alphamap: TextureAlpha,
+    glyphs: []GlyphInfo,
+    firstchar: u21,
+
+    pub fn getGlyphInfo(font: Font, glyph: u21) GlyphInfo {
+        const glyph_index = glyph - font.firstchar;
+        const result = font.glyphs[glyph_index];
+        return result;
+    }
 };
 
 pub const Expandable = struct {
@@ -75,7 +82,7 @@ pub const Expandable = struct {
 pub const Assets = struct {
     atlas: Texture,
     texture_groups: EnumArray(TextureGroupID, []math.Rect2f),
-    fonts: TextureAlpha,
+    font: Font,
 
     pub fn fromSources(allocator: mem.Allocator) !Assets {
 
@@ -204,6 +211,7 @@ pub const Assets = struct {
 
         const px_height_font = 28;
         _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
+        const px_height_line = ft.FT_MulFix(ft_face.*.height, ft_face.*.size.*.metrics.y_scale) >> 6;
 
         var total_font_atlas_area: i32 = 0;
         {
@@ -220,15 +228,22 @@ pub const Assets = struct {
         //
 
         var font_atlas_dim_builder = Expandable.fromEstArea(total_font_atlas_area);
-        var future_atlas_chars_topleft = try allocator.alloc(math.V2i, char_count);
+        var glyphs = try allocator.alloc(GlyphInfo, char_count);
         {
             var ch_index: usize = 0;
             while (ch_index < char_count) : (ch_index += 1) {
                 loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
-                const bm = ft_face.*.glyph.*.bitmap;
+                const ft_glyph = ft_face.*.glyph.*;
+                const bm = ft_glyph.bitmap;
                 const char_dim = math.V2i{ .x = @intCast(i32, bm.width), .y = @intCast(i32, bm.rows) };
                 const builder_topleft = font_atlas_dim_builder.add(char_dim.add(math.V2i{ .x = 2, .y = 2 }));
-                future_atlas_chars_topleft[ch_index] = builder_topleft.add(math.V2i{ .x = 1, .y = 1 });
+
+                var glyph_info = &glyphs[ch_index];
+                glyph_info.* = GlyphInfo{
+                    .coords = math.Rect2i{.topleft = builder_topleft.add(math.V2i{ .x = 1, .y = 1 }), .dim = char_dim},
+                    .advance_x = ft_face.*.glyph.*.advance.x >> 6,
+                    .offset = math.V2i{.x = ft_glyph.bitmap_left, .y = px_height_font - ft_glyph.bitmap_top},
+                };
             }
         }
 
@@ -242,17 +257,17 @@ pub const Assets = struct {
             px.* = 0;
         }
 
-        for (future_atlas_chars_topleft) |atlas_topleft, ch_index| {
+        for (glyphs) |glyph_info, ch_index| {
             loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
             const bm = ft_face.*.glyph.*.bitmap;
 
             var row: i32 = 0;
             while (row < @intCast(i32, bm.rows)) : (row += 1) {
-                const atlas_row = row + atlas_topleft.y;
+                const atlas_row = row + glyph_info.coords.topleft.y;
 
                 var col: i32 = 0;
                 while (col < @intCast(i32, bm.width)) : (col += 1) {
-                    const atlas_col = col + atlas_topleft.x;
+                    const atlas_col = col + glyph_info.coords.topleft.x;
                     const tex_index = row * bm.pitch + col;
                     const atlas_index = atlas_row * font_atlas_dim.x + atlas_col;
 
@@ -265,7 +280,13 @@ pub const Assets = struct {
         const result = Assets{
             .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim },
             .texture_groups = texture_groups,
-            .fonts = TextureAlpha{ .alpha = font_atlas_alpha, .dim = font_atlas_dim },
+            .font = Font{
+                .px_height_font = px_height_font,
+                .px_height_line = px_height_line,
+                .alphamap = TextureAlpha{ .alpha = font_atlas_alpha, .dim = font_atlas_dim },
+                .glyphs = glyphs,
+                .firstchar = firstchar,
+            }
         };
         return result;
     }
