@@ -41,33 +41,24 @@ pub fn main() !void {
     var temp_frame_index: usize = 0;
     var frame_index: usize = 0;
 
-    const TimedSectionID = enum {
-        input,
-        update,
-        clear_buffers,
-        animation,
-        debug_atlases,
-        debug_timings,
-        display_pixels,
-    };
-
-    var timed_sections: std.enums.EnumArray(TimedSectionID, time.Section) = undefined;
+    var timed_sections = time.Sections{.storage = undefined};
 
     while (window.is_running) {
+        timed_sections.used = 0;
 
         //
         // SECTION Input
         //
 
-        timed_sections.getPtr(.input).begin();
+        timed_sections.begin("input");
         window.pollForInput(&input);
-        timed_sections.getPtr(.input).end();
+        timed_sections.endLast();
 
         //
         // SECTION Update
         //
 
-        timed_sections.getPtr(.update).begin();
+        timed_sections.begin("update");
 
         if (input.pressed(.f5)) {
             assets_arena.used = 0;
@@ -85,17 +76,17 @@ pub fn main() !void {
         rect_topleft_x += 0.0;
         rect_topleft_y += 0.0;
 
-        timed_sections.getPtr(.update).end();
+        timed_sections.endLast();
 
         //
         // SECTION Render
         //
 
-        timed_sections.getPtr(.clear_buffers).begin();
+        timed_sections.begin("clear_buffers");
         renderer.clearBuffers();
-        timed_sections.getPtr(.clear_buffers).end();
+        timed_sections.endLast();
 
-        timed_sections.getPtr(.animation).begin();
+        timed_sections.begin("animation");
 
         const req_group = assets.texture_groups.get(.commando_walk);
         const req_tex = req_group[frame_index];
@@ -108,22 +99,20 @@ pub fn main() !void {
             req_tex,
         );
 
-        timed_sections.getPtr(.animation).end();
+        timed_sections.endLast();
 
-        timed_sections.getPtr(.debug_atlases).begin();
+        timed_sections.begin("debug_atlases");
         renderer.drawWholeAtlas(math.V2f{.x = 500, .y = 200});
-        timed_sections.getPtr(.debug_atlases).end();
+        timed_sections.endLast();
 
-        timed_sections.getPtr(.debug_timings).begin();
+        timed_sections.begin("debug_timings");
 
         {
             var y_offset: f32 = 0;
-            var iter = timed_sections.iterator();
             var total_ms: f32 = 0;
-            while (iter.next()) |entry| {
-                const section = entry.value;
+            for (timed_sections.storage[0..timed_sections.used]) |section| {
                 var buf: [64]u8 = undefined;
-                const text = try std.fmt.bufPrint(buf[0..], "{s}: {d:.3}", .{@tagName(entry.key), section.ms});
+                const text = try std.fmt.bufPrint(buf[0..], "{s}: {d:.3}", .{section.name, section.ms});
                 renderer.drawTextline(text, math.V2f{.x = 0, .y = 100 + y_offset}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
                 y_offset += @intToFloat(f32, renderer.font.px_height_line);
                 total_ms += section.ms;
@@ -133,10 +122,10 @@ pub fn main() !void {
             renderer.drawTextline(text, math.V2f{.x = 0, .y = 100 + y_offset}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
         }
 
-        timed_sections.getPtr(.debug_timings).end();
+        timed_sections.endLast();
 
-        timed_sections.getPtr(.display_pixels).begin();
+        timed_sections.begin("display_pixels");
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
-        timed_sections.getPtr(.display_pixels).end();
+        timed_sections.endLast();
     }
 }
