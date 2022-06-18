@@ -96,6 +96,8 @@ pub extern "kernel32" fn WriteFile(
     out_lpNumberOfBytesWritten: ?*DWORD,
     in_out_lpOverlapped: ?*OVERLAPPED,
 ) callconv(WINAPI) BOOL;
+pub extern "kernel32" fn QueryPerformanceCounter(lpPerformanceCount: *LARGE_INTEGER) callconv(WINAPI) BOOL;
+pub extern "kernel32" fn QueryPerformanceFrequency(lpFrequency: *LARGE_INTEGER) callconv(WINAPI) BOOL;
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;

@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const math = @import("math.zig");
+const time = @import("time.zig");
 const wnd = @import("window.zig");
 const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
@@ -41,6 +42,8 @@ pub fn main() !void {
     var frame_index: usize = 0;
 
     while (window.is_running) {
+        const frame_start_clock = time.getCurrentClock();
+
         std.debug.assert(virtual_arena.temp_count == 0);
 
         //
@@ -77,7 +80,7 @@ pub fn main() !void {
 
         const req_group = assets.texture_groups.get(.commando_walk);
         const req_tex = req_group[frame_index];
-        const temp_factor = 50;
+        const temp_factor = 15;
         temp_frame_index = (temp_frame_index + 1) % (req_group.len * temp_factor);
         frame_index = temp_frame_index / temp_factor;
 
@@ -86,10 +89,12 @@ pub fn main() !void {
             req_tex,
         );
 
-        const text = "test";
-        renderer.drawTextline(text, math.V2f{.x = 0, .y = 100}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
-
         renderer.drawWholeAtlas(math.V2f{.x = 0, .y = 200});
+
+        const time_since_start = time.getMsFrom(frame_start_clock);
+        var buf: [64]u8 = undefined;
+        const text = try std.fmt.bufPrint(buf[0..], "{d:.3}", .{time_since_start});
+        renderer.drawTextline(text, math.V2f{.x = 0, .y = 100}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
     }
