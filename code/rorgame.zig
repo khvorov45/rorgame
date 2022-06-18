@@ -75,53 +75,21 @@ pub fn main() !void {
 
         renderer.clearBuffers();
 
-        if (false) {
-            const whole_atlas = math.Rect2f{
-                .topleft = math.V2f{ .x = 1, .y = 1 },
-                .dim = assets.atlas.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
-            };
+        const req_group = assets.texture_groups.get(.commando_walk);
+        const req_tex = req_group[frame_index];
+        const temp_factor = 50;
+        temp_frame_index = (temp_frame_index + 1) % (req_group.len * temp_factor);
+        frame_index = temp_frame_index / temp_factor;
 
-            const screen_rect = math.Rect2f{
-                .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y },
-                .dim = whole_atlas.dim.mulf(5),
-            };
+        renderer.drawRectTex(
+            math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = req_tex.dim.mulf(5) },
+            req_tex,
+        );
 
-            renderer.drawRectTex(screen_rect, whole_atlas);
+        const text = "test";
+        renderer.drawTextline(text, math.V2f{.x = 0, .y = 100}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
 
-            renderer.drawRectOutline(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
-
-            const whole_font_atlas = math.Rect2f{
-                .topleft = math.V2f{ .x = 1, .y = 1 },
-                .dim = assets.fonts.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
-            };
-
-            const screen_rect_fonts = math.Rect2f{
-                .topleft = math.V2f{ .x = screen_rect.topleft.x + screen_rect.dim.x + 20, .y = screen_rect.topleft.y },
-                .dim = whole_font_atlas.dim,
-            };
-
-            renderer.drawRectAlpha(
-                screen_rect_fonts,
-                math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
-                whole_font_atlas,
-            );
-
-            renderer.drawRectOutline(screen_rect_fonts, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
-        } else {
-            const req_group = assets.texture_groups.get(.commando_walk);
-            const req_tex = req_group[frame_index];
-            const temp_factor = 50;
-            temp_frame_index = (temp_frame_index + 1) % (req_group.len * temp_factor);
-            frame_index = temp_frame_index / temp_factor;
-
-            renderer.drawRectTex(
-                math.Rect2f{ .topleft = math.V2f{ .x = rect_topleft_x, .y = rect_topleft_y }, .dim = req_tex.dim.mulf(5) },
-                req_tex,
-            );
-
-            const text = "test";
-            renderer.drawTextline(text, math.V2f{.x = 0, .y = 100}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
-        }
+        renderer.drawWholeAtlas(math.V2f{.x = 0, .y = 200});
 
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
     }

@@ -212,4 +212,38 @@ pub const Renderer = struct {
             topleft_current.x += @intToFloat(f32, glyph_advance_x);
         }
     }
+
+    pub fn drawWholeAtlas(renderer: *Renderer, topleft: math.V2f) void {
+        const whole_atlas = math.Rect2f{
+            .topleft = math.V2f{ .x = 1, .y = 1 },
+            .dim = renderer.atlas.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
+        };
+
+        const screen_rect = math.Rect2f{
+            .topleft = topleft,
+            .dim = whole_atlas.dim.mulf(5),
+        };
+
+        renderer.drawRectTex(screen_rect, whole_atlas);
+
+        renderer.drawRectOutline(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
+
+        const whole_font_atlas = math.Rect2f{
+            .topleft = math.V2f{ .x = 1, .y = 1 },
+            .dim = renderer.font.alphamap.dim.sub(math.V2i{ .x = 2, .y = 2 }).to(math.V2f),
+        };
+
+        const screen_rect_fonts = math.Rect2f{
+            .topleft = math.V2f{ .x = screen_rect.topleft.x + screen_rect.dim.x + 20, .y = screen_rect.topleft.y },
+            .dim = whole_font_atlas.dim,
+        };
+
+        renderer.drawRectAlpha(
+            screen_rect_fonts,
+            math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+            whole_font_atlas,
+        );
+
+        renderer.drawRectOutline(screen_rect_fonts, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
+    }
 };
