@@ -44,6 +44,8 @@ pub fn main() !void {
     var timer = time.Timer.new();
     const target_frame_ms: f32 = 1000.0 / 60.0;
 
+    var last_clock_before_display = time.getCurrentClock();
+
     while (window.is_running) {
 
         timer.begin(.frame);
@@ -136,30 +138,30 @@ pub fn main() !void {
             timer.end();
         }
 
-        timer.begin(.display_pixels);
-        window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
-        timer.end();
-
         timer.end(); // NOTE(khvorov) work
 
         timer.begin(.wait);
         {
             timer.begin(.sleep);
-            const ms_remaining = target_frame_ms - timer.getMsFromSectionStart(.frame);
+            const ms_remaining = target_frame_ms - time.getMsFrom(last_clock_before_display);
             timer.sleep(ms_remaining);
             timer.end();
         }
 
         {
             timer.begin(.spin);
-            const time_so_far = timer.getMsFromSectionStart(.frame);
-            var ms_remaining = target_frame_ms - time_so_far;
+            var ms_remaining = target_frame_ms - time.getMsFrom(last_clock_before_display);
             while (ms_remaining > 0) {
-                ms_remaining = target_frame_ms - timer.getMsFromSectionStart(.frame);
+                ms_remaining = target_frame_ms - time.getMsFrom(last_clock_before_display);
             }
             timer.end();
         }
         timer.end(); // NOTE(khvorov) wait
+
+        timer.begin(.display_pixels);
+        last_clock_before_display = time.getCurrentClock();
+        window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
+        timer.end();
 
         timer.end(); // NOTE(khvorov) frame
     }

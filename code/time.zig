@@ -32,10 +32,10 @@ pub const SectionID = enum {
     animation,
     debug_atlases,
     debug_timings,
-    display_pixels,
     wait,
     sleep,
     spin,
+    display_pixels,
 };
 
 pub const SectionsBuf = std.enums.EnumArray(SectionID, Section);
