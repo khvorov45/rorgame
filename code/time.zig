@@ -11,8 +11,11 @@ pub const Section = struct {
     nest_level: i32 = 0,
 
     pub fn begin(section: *Section, nest_level: i32) void {
-        section.start = platform.getCurrentClock();
-        section.nest_level = nest_level;
+        section.* = Section{
+            .start = platform.getCurrentClock(),
+            .nest_level = nest_level,
+            .ms = null,
+        };
     }
 
     pub fn end(section: *Section) void {
@@ -73,6 +76,8 @@ pub const Timer = struct {
         var index = timer.sections_index;
         if (index == 0) {
             index = timer.sections.len - 1;
+        } else {
+            index -= 1;
         }
         return &timer.sections[index];
     }

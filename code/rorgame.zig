@@ -136,7 +136,6 @@ pub fn main() !void {
             timer.end();
         }
 
-
         timer.begin(.display_pixels);
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
         timer.end();
