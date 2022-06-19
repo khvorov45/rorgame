@@ -2,7 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const math = @import("math.zig");
-const time = @import("time.zig");
 const wnd = @import("window.zig");
 const mem = @import("mem.zig");
 const rdr = @import("renderer.zig");
@@ -10,6 +9,7 @@ const log = @import("log.zig");
 const fs = @import("filesystem.zig");
 const Assets = @import("assets.zig").Assets;
 const Input = @import("input.zig").Input;
+const time = @import("time.zig");
 
 const platform = if (builtin.os.tag == .windows) @import("rorgame_windows.zig") else @panic("unimplemented root");
 
@@ -37,29 +37,31 @@ pub fn main() !void {
     var input = Input.new();
 
     var rect_topleft_x: f32 = 0;
-    var rect_topleft_y: f32 = 0;
+    var rect_topleft_y: f32 = 100;
     var temp_frame_index: usize = 0;
     var frame_index: usize = 0;
 
-    var timed_sections = time.Sections.new();
+    var timer = time.Timer.new();
+    const target_frame_ms: f32 = 1000.0 / 60.0;
 
     while (window.is_running) {
 
-        timed_sections.begin(.frame);
+        timer.begin(.frame);
+        timer.begin(.work);
 
         //
         // SECTION Input
         //
 
-        timed_sections.begin(.input);
+        timer.begin(.input);
         window.pollForInput(&input);
-        timed_sections.end();
+        timer.end();
 
         //
         // SECTION Update
         //
 
-        timed_sections.begin(.update);
+        timer.begin(.update);
 
         if (input.pressed(.f5)) {
             assets_arena.used = 0;
@@ -77,17 +79,17 @@ pub fn main() !void {
         rect_topleft_x += 0.0;
         rect_topleft_y += 0.0;
 
-        timed_sections.end();
+        timer.end();
 
         //
         // SECTION Render
         //
 
-        timed_sections.begin(.clear_buffers);
+        timer.begin(.clear_buffers);
         renderer.clearBuffers();
-        timed_sections.end();
+        timer.end();
 
-        timed_sections.begin(.animation);
+        timer.begin(.animation);
 
         const req_group = assets.texture_groups.get(.commando_walk);
         const req_tex = req_group[frame_index];
@@ -100,20 +102,22 @@ pub fn main() !void {
             req_tex,
         );
 
-        timed_sections.end();
+        timer.end();
 
-        timed_sections.begin(.debug_atlases);
-        renderer.drawWholeAtlas(math.V2f{.x = 500, .y = 200});
-        timed_sections.end();
-
-        timed_sections.begin(.debug_timings);
+        if (true) {
+            timer.begin(.debug_atlases);
+            renderer.drawWholeAtlas(math.V2f{.x = 500, .y = 200});
+            timer.end();
+        }
 
         {
+            timer.begin(.debug_timings);
+
             var y_offset: f32 = 0;
-            var iter = timed_sections.sections.iterator();
+            var iter = timer.getLastFrameSections().iterator();
             while (iter.next()) |entry| {
-                const maybe_section = entry.value;
-                if (maybe_section.*) |section| {
+                const section = entry.value;
+                if (section.ms) |duration| {
                     var buf: [64]u8 = undefined;
                     var buf_index: usize = 0;
                     {
@@ -123,19 +127,41 @@ pub fn main() !void {
                             buf_index += str.len;
                         }
                     }
-                    const text = try std.fmt.bufPrint(buf[buf_index..], "{s}: {d:.3}", .{@tagName(entry.key), section.ms});
-                    renderer.drawTextline(buf[0..buf_index + text.len], math.V2f{.x = 0, .y = 100 + y_offset}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
+                    const text = try std.fmt.bufPrint(buf[buf_index..], "{s}: {d:.3}", .{@tagName(entry.key), duration});
+                    renderer.drawTextline(buf[0..buf_index + text.len], math.V2f{.x = 0, .y = y_offset}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
                     y_offset += @intToFloat(f32, renderer.font.px_height_line);
                 }
             }
+
+            timer.end();
         }
 
-        timed_sections.end();
 
-        timed_sections.begin(.display_pixels);
+        timer.begin(.display_pixels);
         window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
-        timed_sections.end();
+        timer.end();
 
-        timed_sections.end();
+        timer.end(); // NOTE(khvorov) work
+
+        timer.begin(.wait);
+        {
+            timer.begin(.sleep);
+            const ms_remaining = target_frame_ms - timer.getMsFromSectionStart(.frame);
+            timer.sleep(ms_remaining);
+            timer.end();
+        }
+
+        {
+            timer.begin(.spin);
+            const time_so_far = timer.getMsFromSectionStart(.frame);
+            var ms_remaining = target_frame_ms - time_so_far;
+            while (ms_remaining > 0) {
+                ms_remaining = target_frame_ms - timer.getMsFromSectionStart(.frame);
+            }
+            timer.end();
+        }
+        timer.end(); // NOTE(khvorov) wait
+
+        timer.end(); // NOTE(khvorov) frame
     }
 }

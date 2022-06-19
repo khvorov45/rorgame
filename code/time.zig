@@ -7,7 +7,7 @@ usingnamespace platform;
 
 pub const Section = struct {
     start: platform.Clock = 0,
-    ms: f32 = 0,
+    ms: ?f32 = null,
     nest_level: i32 = 0,
 
     pub fn begin(section: *Section, nest_level: i32) void {
@@ -22,6 +22,7 @@ pub const Section = struct {
 
 pub const SectionID = enum {
     frame,
+    work,
     input,
     update,
     clear_buffers,
@@ -29,47 +30,85 @@ pub const SectionID = enum {
     debug_atlases,
     debug_timings,
     display_pixels,
+    wait,
+    sleep,
+    spin,
 };
 
-pub const Sections = struct {
-    sections: std.enums.EnumArray(SectionID, ?Section),
+pub const SectionsBuf = std.enums.EnumArray(SectionID, Section);
+
+pub const Timer = struct {
+    sections: [2]SectionsBuf,
+    sections_index: usize,
     current_nest_level: i32,
     last: [@typeInfo(SectionID).Enum.fields.len]SectionID,
     last_index: usize,
+    min_sleep_ms: f32,
 
-    pub fn new() Sections {
-        var sections = Sections {
+    pub fn new() Timer {
+        var timer = Timer {
             .sections = undefined,
+            .sections_index = 0,
             .current_nest_level = 0,
             .last = undefined,
             .last_index = 0,
+            .min_sleep_ms = platform.getMinSleepMs(),
         };
-        var iter = sections.sections.iterator();
-        while (iter.next()) |*entry| {
-            entry.value.* = null;
+
+        for (timer.sections) |*set| {
+            var iter = set.iterator();
+            while (iter.next()) |*entry| {
+                entry.value.* = Section{};
+            }
         }
-        return sections;
+
+        return timer;
     }
 
-    pub fn begin(sections: *Sections, id: SectionID) void {
-        assert(sections.last_index < sections.last.len);
-        var maybe_section = sections.sections.getPtr(id);
-        if (maybe_section.*) |sec| {
-            _ = sec;
-        } else {
-            maybe_section.* = Section{};
-        }
-        maybe_section.*.?.begin(sections.current_nest_level);
-        sections.current_nest_level += 1;
-        sections.last[sections.last_index] = id;
-        sections.last_index += 1;
+    pub fn getCurrentFrameSections(timer: *Timer) *SectionsBuf {
+        return &timer.sections[timer.sections_index];
     }
 
-    pub fn end(sections: *Sections) void {
-        assert(sections.current_nest_level > 0);
-        assert(sections.last_index > 0);
-        sections.last_index -= 1;
-        sections.sections.getPtr(sections.last[sections.last_index]).*.?.end();
-        sections.current_nest_level -= 1;
+    pub fn getLastFrameSections(timer: *Timer) *SectionsBuf {
+        var index = timer.sections_index;
+        if (index == 0) {
+            index = timer.sections.len - 1;
+        }
+        return &timer.sections[index];
+    }
+
+    pub fn begin(timer: *Timer, id: SectionID) void {
+        assert(timer.last_index < timer.last.len);
+        const sections = timer.getCurrentFrameSections();
+        sections.getPtr(id).begin(timer.current_nest_level);
+        timer.current_nest_level += 1;
+        timer.last[timer.last_index] = id;
+        timer.last_index += 1;
+    }
+
+    pub fn end(timer: *Timer) void {
+        assert(timer.current_nest_level > 0);
+        assert(timer.last_index > 0);
+        timer.last_index -= 1;
+        const last_id = timer.last[timer.last_index];
+        const sections = timer.getCurrentFrameSections();
+        sections.getPtr(last_id).end();
+        timer.current_nest_level -= 1;
+        if (last_id == .frame) {
+            timer.sections_index = (timer.sections_index + 1) % timer.sections.len;
+        }
+    }
+
+    pub fn getMsFromSectionStart(timer: *Timer, id: SectionID) f32 {
+        const result = platform.getMsFrom(timer.getCurrentFrameSections().get(id).start);
+        return result;
+    }
+
+    pub fn sleep(timer: Timer, ms: f32) void {
+        const periods = @floor(ms / timer.min_sleep_ms);
+        const to_sleep = timer.min_sleep_ms * periods;
+        if (to_sleep > 0) {
+            platform.sleep(to_sleep);
+        }
     }
 };

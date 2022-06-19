@@ -209,7 +209,7 @@ pub const Assets = struct {
         var ft_face: ft.FT_Face = undefined;
         _ = ft.FT_New_Memory_Face(ft_lib, font_file_data.ptr, @intCast(c_long, font_file_data.len), 0, &ft_face);
 
-        const px_height_font = 16;
+        const px_height_font = 14;
         _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
         const px_height_line = ft.FT_MulFix(ft_face.*.height, ft_face.*.size.*.metrics.y_scale) >> 6;
 
