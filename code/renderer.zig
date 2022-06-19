@@ -197,7 +197,7 @@ pub const Renderer = struct {
 
     pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
         const glyph_info = renderer.font.getGlyphInfo(glyph);
-        const glyph_screen_rect = math.Rect2f{.topleft = topleft.add(glyph_info.offset.to(math.V2f)), .dim = glyph_info.coords.dim.to(math.V2f)};
+        const glyph_screen_rect = math.Rect2f{ .topleft = topleft.add(glyph_info.offset.to(math.V2f)), .dim = glyph_info.coords.dim.to(math.V2f) };
         const glyph_tex_rect = glyph_info.coords.to(math.Rect2f);
         renderer.drawRectAlpha(glyph_screen_rect, color, glyph_tex_rect);
         return glyph_info.advance_x;
@@ -206,7 +206,7 @@ pub const Renderer = struct {
     pub fn drawTextline(renderer: *Renderer, text: []const u8, topleft_init: math.V2f, color: math.Color) void {
         var topleft_current = topleft_init;
         var utf8_view = unicode.Utf8View.init(text) catch unreachable;
-        var utf8 = utf8_view.iterator() ;
+        var utf8 = utf8_view.iterator();
         while (utf8.nextCodepoint()) |codepoint| {
             const glyph_advance_x = renderer.drawGlyph(codepoint, topleft_current, color);
             topleft_current.x += @intToFloat(f32, glyph_advance_x);

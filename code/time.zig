@@ -49,7 +49,7 @@ pub const Timer = struct {
     min_sleep_ms: f32,
 
     pub fn new() Timer {
-        var timer = Timer {
+        var timer = Timer{
             .sections = undefined,
             .sections_index = 0,
             .current_nest_level = 0,

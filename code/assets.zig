@@ -240,9 +240,9 @@ pub const Assets = struct {
 
                 var glyph_info = &glyphs[ch_index];
                 glyph_info.* = GlyphInfo{
-                    .coords = math.Rect2i{.topleft = builder_topleft.add(math.V2i{ .x = 1, .y = 1 }), .dim = char_dim},
+                    .coords = math.Rect2i{ .topleft = builder_topleft.add(math.V2i{ .x = 1, .y = 1 }), .dim = char_dim },
                     .advance_x = ft_face.*.glyph.*.advance.x >> 6,
-                    .offset = math.V2i{.x = ft_glyph.bitmap_left, .y = px_height_font - ft_glyph.bitmap_top},
+                    .offset = math.V2i{ .x = ft_glyph.bitmap_left, .y = px_height_font - ft_glyph.bitmap_top },
                 };
             }
         }
@@ -277,17 +277,13 @@ pub const Assets = struct {
             }
         }
 
-        const result = Assets{
-            .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim },
-            .texture_groups = texture_groups,
-            .font = Font{
-                .px_height_font = px_height_font,
-                .px_height_line = px_height_line,
-                .alphamap = TextureAlpha{ .alpha = font_atlas_alpha, .dim = font_atlas_dim },
-                .glyphs = glyphs,
-                .firstchar = firstchar,
-            }
-        };
+        const result = Assets{ .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim }, .texture_groups = texture_groups, .font = Font{
+            .px_height_font = px_height_font,
+            .px_height_line = px_height_line,
+            .alphamap = TextureAlpha{ .alpha = font_atlas_alpha, .dim = font_atlas_dim },
+            .glyphs = glyphs,
+            .firstchar = firstchar,
+        } };
         return result;
     }
 

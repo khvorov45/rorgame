@@ -36,8 +36,8 @@ pub fn main() !void {
 
     var input = Input.new();
 
-    var rect_topleft_x: f32 = 0;
-    var rect_topleft_y: f32 = 100;
+    var rect_topleft_x: f32 = 500;
+    var rect_topleft_y: f32 = 600;
     var temp_frame_index: usize = 0;
     var frame_index: usize = 0;
 
@@ -47,7 +47,6 @@ pub fn main() !void {
     var last_clock_before_display = time.getCurrentClock();
 
     while (window.is_running) {
-
         timer.begin(.frame);
         timer.begin(.work);
 
@@ -108,37 +107,19 @@ pub fn main() !void {
 
         if (true) {
             timer.begin(.debug_atlases);
-            renderer.drawWholeAtlas(math.V2f{.x = 500, .y = 200});
+            renderer.drawWholeAtlas(math.V2f{ .x = 500, .y = 200 });
             timer.end();
         }
 
-        {
-            timer.begin(.debug_timings);
-
-            var y_offset: f32 = 0;
-            var iter = timer.getLastFrameSections().iterator();
-            while (iter.next()) |entry| {
-                const section = entry.value;
-                if (section.ms) |duration| {
-                    var buf: [64]u8 = undefined;
-                    var buf_index: usize = 0;
-                    {
-                        var nest_level = section.nest_level;
-                        while (nest_level > 0) : (nest_level -= 1) {
-                            const str = try std.fmt.bufPrint(buf[buf_index..], "    ", .{});
-                            buf_index += str.len;
-                        }
-                    }
-                    const text = try std.fmt.bufPrint(buf[buf_index..], "{s}: {d:.3}", .{@tagName(entry.key), duration});
-                    renderer.drawTextline(buf[0..buf_index + text.len], math.V2f{.x = 0, .y = y_offset}, math.Color{.r = 1, .g = 1, .b = 1, .a = 1});
-                    y_offset += @intToFloat(f32, renderer.font.px_height_line);
-                }
-            }
-
-            timer.end();
-        }
+        timer.begin(.debug_timings);
+        try displayTimings(&timer, &renderer);
+        timer.end();
 
         timer.end(); // NOTE(khvorov) work
+
+        //
+        // SECTION Wait
+        //
 
         timer.begin(.wait);
         {
@@ -164,5 +145,68 @@ pub fn main() !void {
         timer.end();
 
         timer.end(); // NOTE(khvorov) frame
+    }
+}
+
+fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer) !void {
+    const sections = timer.getLastFrameSections();
+    const topleft = math.V2f{ .x = 0, .y = 0 };
+    const height: f32 = 200;
+    const width: f32 = 20;
+
+    if (sections.get(.frame).ms) |frame_ms| {
+        _ = frame_ms;
+
+        var iter = sections.iterator();
+        var y_offset = [_]f32{0} ** 10;
+        while (iter.next()) |entry| {
+            const section = entry.value;
+            if (section.ms) |section_ms| {
+                const prop = section_ms / frame_ms;
+                const section_height = prop * height;
+
+                const this_y_offset = &y_offset[@intCast(usize, section.nest_level)];
+                const section_topleft = topleft.add(math.V2f{ .x = @intToFloat(f32, section.nest_level) * width, .y = this_y_offset.* });
+                this_y_offset.* = this_y_offset.* + section_height;
+
+                renderer.drawRect(
+                    math.Rect2f{ .topleft = section_topleft, .dim = math.V2f{ .x = width, .y = section_height } },
+                    math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+                );
+            }
+        }
+
+        try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height });
+    }
+}
+
+fn printSectionTimes(sections: *time.SectionsBuf, renderer: *rdr.Renderer, topleft: math.V2f) !void {
+    var y_offset: f32 = 0;
+    var iter = sections.iterator();
+
+    while (iter.next()) |entry| {
+        const section = entry.value;
+
+        if (section.ms) |duration| {
+            var buf: [64]u8 = undefined;
+            var buf_index: usize = 0;
+            {
+                var nest_level = section.nest_level;
+                while (nest_level > 0) : (nest_level -= 1) {
+                    const str = try std.fmt.bufPrint(buf[buf_index..], "    ", .{});
+                    buf_index += str.len;
+                }
+            }
+
+            const text = try std.fmt.bufPrint(buf[buf_index..], "{s}: {d:.3}", .{ @tagName(entry.key), duration });
+
+            renderer.drawTextline(
+                buf[0 .. buf_index + text.len],
+                math.V2f{ .x = topleft.x, .y = topleft.y + y_offset },
+                math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+            );
+
+            y_offset += @intToFloat(f32, renderer.font.px_height_line);
+        }
     }
 }
