@@ -107,6 +107,11 @@ pub const Color = struct {
         return result;
     }
 
+    pub fn fromRGB255(r: i32, g: i32, b: i32) Color {
+        const result = Color{ .r = @intToFloat(f32, r) / 255, .g = @intToFloat(f32, g) / 255, .b = @intToFloat(f32, b) / 255, .a = 1 };
+        return result;
+    }
+
     pub fn transitionBlend(start: Color, on_start: f32, end: Color) Color {
         const final_alpha = start.a * on_start + end.a * (1 - on_start);
         const start_rgb_coef = safeRatio0(on_start * start.a, final_alpha);

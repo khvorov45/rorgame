@@ -35,7 +35,24 @@ pub const Renderer = struct {
         return result;
     }
 
-    pub fn drawRect(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
+    pub fn drawRectNoAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
+        const color32 = color.toU32ARGB();
+        const rect_clipped = renderer.clipRectToDrawBuffer(rect);
+
+        const topleft_aligned = rect_clipped.topleft.round();
+        const bottomright_aligned = topleft_aligned.add(rect_clipped.dim).round();
+
+        var row = @floatToInt(i32, topleft_aligned.y);
+        while (row < @floatToInt(i32, bottomright_aligned.y)) : (row += 1) {
+            var col = @floatToInt(i32, topleft_aligned.x);
+            while (col < @floatToInt(i32, bottomright_aligned.x)) : (col += 1) {
+                const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
+                renderer.draw_buffer.pixels[px_index] = color32;
+            }
+        }
+    }
+
+    pub fn drawRectAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
         const rect_clipped = renderer.clipRectToDrawBuffer(rect);
         const bottomright = rect_clipped.bottomright();
 
@@ -181,7 +198,7 @@ pub const Renderer = struct {
         }
     }
 
-    pub fn drawRectOutline(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
+    pub fn drawRectOutlineAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
         const thickness = 2;
 
         const top = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = rect.dim.x, .y = thickness } };
@@ -189,10 +206,10 @@ pub const Renderer = struct {
         const left = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = thickness, .y = rect.dim.y } };
         const right = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x + rect.dim.x - thickness, .y = rect.topleft.y }, .dim = left.dim };
 
-        renderer.drawRect(top, color);
-        renderer.drawRect(bottom, color);
-        renderer.drawRect(left, color);
-        renderer.drawRect(right, color);
+        renderer.drawRectAA(top, color);
+        renderer.drawRectAA(bottom, color);
+        renderer.drawRectAA(left, color);
+        renderer.drawRectAA(right, color);
     }
 
     pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
@@ -226,7 +243,7 @@ pub const Renderer = struct {
 
         renderer.drawRectTex(screen_rect, whole_atlas);
 
-        renderer.drawRectOutline(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
+        renderer.drawRectOutlineAA(screen_rect, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
 
         const whole_font_atlas = math.Rect2f{
             .topleft = math.V2f{ .x = 1, .y = 1 },
@@ -244,6 +261,6 @@ pub const Renderer = struct {
             whole_font_atlas,
         );
 
-        renderer.drawRectOutline(screen_rect_fonts, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
+        renderer.drawRectOutlineAA(screen_rect_fonts, math.Color{ .r = 0, .g = 1, .b = 1, .a = 0.5 });
     }
 };

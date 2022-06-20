@@ -112,7 +112,7 @@ pub fn main() !void {
         }
 
         timer.begin(.debug_timings);
-        try displayTimings(&timer, &renderer);
+        try displayTimings(&timer, &renderer, target_frame_ms);
         timer.end();
 
         timer.end(); // NOTE(khvorov) work
@@ -148,41 +148,70 @@ pub fn main() !void {
     }
 }
 
-fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer) !void {
+fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: f32) !void {
     const sections = timer.getLastFrameSections();
     const topleft = math.V2f{ .x = 0, .y = 0 };
     const height: f32 = 200;
     const width: f32 = 20;
+    const outline_thickness = 1;
 
-    if (sections.get(.frame).ms) |frame_ms| {
-        _ = frame_ms;
+    var iter = sections.iterator();
+    var y_offset = [_]f32{0} ** 10;
 
-        var iter = sections.iterator();
-        var y_offset = [_]f32{0} ** 10;
-        while (iter.next()) |entry| {
+    const colors = [_]math.Color{
+        math.Color.fromRGB255(154, 199, 223),
+        math.Color.fromRGB255(85, 169, 226),
+        math.Color.fromRGB255(175, 222, 133),
+        math.Color.fromRGB255(110, 213, 103),
+        math.Color.fromRGB255(250, 136, 135),
+        math.Color.fromRGB255(232, 50, 52),
+        math.Color.fromRGB255(253, 188, 104),
+        math.Color.fromRGB255(255, 140, 26),
+        math.Color.fromRGB255(195, 168, 209),
+        math.Color.fromRGB255(153, 111, 198),
+        math.Color.fromRGB255(255, 255, 133),
+        math.Color.fromRGB255(218, 135, 90),
+    };
+    var color_indices = [_]usize{0} ** 10;
+
+    while (iter.next()) |entry| {
+        if (entry.key != .frame) {
             const section = entry.value;
             if (section.ms) |section_ms| {
-                const prop = section_ms / frame_ms;
-                const section_height = prop * height;
+                const prop = section_ms / target_frame_ms;
+                const section_height = @round(prop * height);
 
                 const this_y_offset = &y_offset[@intCast(usize, section.nest_level)];
-                const section_topleft = topleft.add(math.V2f{ .x = @intToFloat(f32, section.nest_level) * width, .y = this_y_offset.* });
+                const section_topleft = topleft.add(math.V2f{ .x = @intToFloat(f32, section.nest_level - 1) * (width), .y = this_y_offset.* });
                 this_y_offset.* = this_y_offset.* + section_height;
 
-                renderer.drawRect(
+                const this_color_index = &color_indices[@intCast(usize, section.nest_level)];
+                renderer.drawRectNoAA(
                     math.Rect2f{ .topleft = section_topleft, .dim = math.V2f{ .x = width, .y = section_height } },
-                    math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+                    colors[this_color_index.*],
+                );
+                this_color_index.* = (this_color_index.* + 1) % colors.len;
+
+                renderer.drawRectNoAA(
+                    math.Rect2f{ .topleft = section_topleft.add(math.V2f{ .x = width - 1, .y = 0 }), .dim = math.V2f{ .x = outline_thickness, .y = section_height } },
+                    math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
                 );
             }
         }
-
-        try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height });
     }
+
+    renderer.drawRectNoAA(
+        math.Rect2f{ .topleft = topleft.add(math.V2f{ .x = 0, .y = height }), .dim = math.V2f{ .x = @intToFloat(f32, renderer.draw_buffer.dim.x), .y = outline_thickness } },
+        math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
+    );
+
+    try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
 }
 
-fn printSectionTimes(sections: *time.SectionsBuf, renderer: *rdr.Renderer, topleft: math.V2f) !void {
+fn printSectionTimes(sections: *time.SectionsBuf, renderer: *rdr.Renderer, topleft: math.V2f, colors: []const math.Color) !void {
     var y_offset: f32 = 0;
     var iter = sections.iterator();
+    var color_indices = [_]usize{0} ** 10;
 
     while (iter.next()) |entry| {
         const section = entry.value;
@@ -200,11 +229,13 @@ fn printSectionTimes(sections: *time.SectionsBuf, renderer: *rdr.Renderer, tople
 
             const text = try std.fmt.bufPrint(buf[buf_index..], "{s}: {d:.3}", .{ @tagName(entry.key), duration });
 
+            const this_color_index = &color_indices[@intCast(usize, section.nest_level)];
             renderer.drawTextline(
                 buf[0 .. buf_index + text.len],
                 math.V2f{ .x = topleft.x, .y = topleft.y + y_offset },
-                math.Color{ .r = 1, .g = 1, .b = 1, .a = 1 },
+                colors[this_color_index.*],
             );
+            this_color_index.* = (this_color_index.* + 1) % colors.len;
 
             y_offset += @intToFloat(f32, renderer.font.px_height_line);
         }
