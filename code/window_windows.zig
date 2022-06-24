@@ -88,6 +88,11 @@ pub const Window = struct {
             _ = win.TranslateMessage(&msg);
             _ = win.DispatchMessageW(&msg);
         }
+
+        var point: win.POINT = undefined;
+        _ = win.GetCursorPos(&point);
+        _ = win.ScreenToClient(window.platform.hwnd, &point);
+        input.cursor_pos = math.V2i{ .x = point.x, .y = point.y };
     }
 
     pub fn displayPixels(window: *Window, pixels: []u32, pixels_dim: math.V2i) void {

@@ -112,7 +112,7 @@ pub fn main() !void {
         }
 
         timer.begin(.debug_timings);
-        try displayTimings(&timer, &renderer, target_frame_ms);
+        try displayTimings(&timer, &renderer, target_frame_ms, &input);
         timer.end();
 
         timer.end(); // NOTE(khvorov) work
@@ -148,15 +148,11 @@ pub fn main() !void {
     }
 }
 
-fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: f32) !void {
-    const sections = timer.getLastFrameSections();
+fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: f32, input: *Input) !void {
     const topleft = math.V2f{ .x = 0, .y = 0 };
     const height: f32 = 200;
-    const width: f32 = 20;
+    const width_per_column: f32 = 20;
     const outline_thickness = 1;
-
-    var iter = sections.iterator();
-    var y_offset = [_]f32{0} ** 10;
 
     const colors = [_]math.Color{
         math.Color.fromRGB255(154, 199, 223),
@@ -172,40 +168,64 @@ fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: 
         math.Color.fromRGB255(255, 255, 133),
         math.Color.fromRGB255(218, 135, 90),
     };
-    var color_indices = [_]usize{0} ** 10;
 
-    while (iter.next()) |entry| {
-        if (entry.key != .frame) {
-            const section = entry.value;
-            if (section.ms) |section_ms| {
-                const prop = section_ms / target_frame_ms;
-                const section_height = @round(prop * height);
+    var sections_x_offset: f32 = 0;
+    var sections_index = timer.getNextSectionsIndex(timer.sections_index);
+    while (sections_index != timer.sections_index) : (sections_index = timer.getNextSectionsIndex(sections_index)) {
+        const sections = &timer.sections[sections_index];
+        var iter = sections.iterator();
+        var entry_y_offsets = [_]f32{0} ** 10;
 
-                const this_y_offset = &y_offset[@intCast(usize, section.nest_level)];
-                const section_topleft = topleft.add(math.V2f{ .x = @intToFloat(f32, section.nest_level - 1) * (width), .y = this_y_offset.* });
-                this_y_offset.* = this_y_offset.* + section_height;
+        var color_indices = [_]usize{0} ** 10;
+        var column_count: i32 = 0;
 
-                const this_color_index = &color_indices[@intCast(usize, section.nest_level)];
-                renderer.drawRectNoAA(
-                    math.Rect2f{ .topleft = section_topleft, .dim = math.V2f{ .x = width, .y = section_height } },
-                    colors[this_color_index.*],
-                );
-                this_color_index.* = (this_color_index.* + 1) % colors.len;
+        while (iter.next()) |entry| {
+            if (entry.key != .frame) {
+                const section = entry.value;
+                if (section.ms) |section_ms| {
+                    const prop = section_ms / target_frame_ms;
+                    const section_height = @round(prop * height);
 
-                renderer.drawRectNoAA(
-                    math.Rect2f{ .topleft = section_topleft.add(math.V2f{ .x = width - 1, .y = 0 }), .dim = math.V2f{ .x = outline_thickness, .y = section_height } },
-                    math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
-                );
+                    const entry_y_offset = &entry_y_offsets[@intCast(usize, section.nest_level)];
+                    const column_index = section.nest_level - 1;
+                    const section_topleft = topleft.add(math.V2f{ .x = sections_x_offset + @intToFloat(f32, column_index) * width_per_column, .y = entry_y_offset.* });
+                    entry_y_offset.* = entry_y_offset.* + section_height;
+
+                    const this_color_index = &color_indices[@intCast(usize, section.nest_level)];
+                    renderer.drawRectNoAA(
+                        math.Rect2f{ .topleft = section_topleft, .dim = math.V2f{ .x = width_per_column, .y = section_height } },
+                        colors[this_color_index.*],
+                    );
+                    this_color_index.* = (this_color_index.* + 1) % colors.len;
+
+                    renderer.drawRectNoAA(
+                        math.Rect2f{ .topleft = section_topleft.add(math.V2f{ .x = width_per_column - 1, .y = 0 }), .dim = math.V2f{ .x = outline_thickness, .y = section_height } },
+                        math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
+                    );
+
+                    column_count = @maximum(column_count, column_index + 1);
+                }
             }
         }
+
+        renderer.drawRectNoAA(
+            math.Rect2f{
+                .topleft = topleft.add(math.V2f{ .x = 0, .y = height }),
+                .dim = math.V2f{ .x = @intToFloat(f32, renderer.draw_buffer.dim.x), .y = outline_thickness },
+            },
+            math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
+        );
+
+        const bounding_rect = math.Rect2f{
+            .topleft = topleft.add(math.V2f{ .x = sections_x_offset, .y = 0 }),
+            .dim = math.V2f{ .x = @intToFloat(f32, column_count) * width_per_column, .y = height },
+        };
+        if (math.pointInRect(input.cursor_pos.to(math.V2f), bounding_rect)) {
+            try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
+        }
+
+        sections_x_offset += bounding_rect.dim.x;
     }
-
-    renderer.drawRectNoAA(
-        math.Rect2f{ .topleft = topleft.add(math.V2f{ .x = 0, .y = height }), .dim = math.V2f{ .x = @intToFloat(f32, renderer.draw_buffer.dim.x), .y = outline_thickness } },
-        math.Color{ .r = 0.5, .g = 0.5, .b = 0.5, .a = 1 },
-    );
-
-    try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
 }
 
 fn printSectionTimes(sections: *time.SectionsBuf, renderer: *rdr.Renderer, topleft: math.V2f, colors: []const math.Color) !void {

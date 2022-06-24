@@ -99,6 +99,33 @@ pub extern "kernel32" fn WriteFile(
 pub extern "kernel32" fn QueryPerformanceCounter(lpPerformanceCount: *LARGE_INTEGER) callconv(WINAPI) BOOL;
 pub extern "kernel32" fn QueryPerformanceFrequency(lpFrequency: *LARGE_INTEGER) callconv(WINAPI) BOOL;
 pub extern "kernel32" fn Sleep(dwMilliseconds: DWORD) callconv(WINAPI) void;
+pub extern "user32" fn GetCursorPos(lpPoint: LPPOINT) callconv(WINAPI) BOOL;
+pub extern "user32" fn ScreenToClient(hwnd: HWND, lpPoint: LPPOINT) callconv(WINAPI) BOOL;
+
+pub const RECT = extern struct {
+    left: LONG,
+    top: LONG,
+    right: LONG,
+    bottom: LONG,
+};
+
+pub const SMALL_RECT = extern struct {
+    Left: SHORT,
+    Top: SHORT,
+    Right: SHORT,
+    Bottom: SHORT,
+};
+
+pub const POINT = extern struct {
+    x: LONG,
+    y: LONG,
+};
+pub const LPPOINT = *POINT;
+
+pub const COORD = extern struct {
+    X: SHORT,
+    Y: SHORT,
+};
 
 pub const BOOL = i32;
 pub const BOOLEAN = BYTE;
@@ -302,11 +329,6 @@ pub const MSG = extern struct {
     time: DWORD,
     pt: POINT,
     lPrivate: DWORD,
-};
-
-pub const POINT = extern struct {
-    x: LONG,
-    y: LONG,
 };
 
 pub const OVERLAPPED = extern struct {

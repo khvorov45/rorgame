@@ -1,10 +1,13 @@
+const math = @import("math.zig");
+
 const EnumArray = @import("std").enums.EnumArray;
 
 pub const Input = struct {
+    cursor_pos: math.V2i,
     keys: EnumArray(KeyID, Key),
 
     pub fn new() Input {
-        var input = Input{ .keys = undefined };
+        var input = Input{ .cursor_pos = math.V2i{ .x = -1, .y = -1 }, .keys = undefined };
         input.clearKeys();
         return input;
     }

@@ -137,3 +137,11 @@ fn safeRatio0(v1: f32, v2: f32) f32 {
     }
     return v1 / v2;
 }
+
+pub fn pointInRect(point: V2f, rect: Rect2f) bool {
+    const bottomright = rect.bottomright();
+    const in_x = point.x >= rect.topleft.x and point.x < bottomright.x;
+    const in_y = point.y >= rect.topleft.y and point.y < bottomright.y;
+    const result = in_x and in_y;
+    return result;
+}

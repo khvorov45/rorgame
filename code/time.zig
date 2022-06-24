@@ -41,7 +41,7 @@ pub const SectionID = enum {
 pub const SectionsBuf = std.enums.EnumArray(SectionID, Section);
 
 pub const Timer = struct {
-    sections: [2]SectionsBuf,
+    sections: [20]SectionsBuf,
     sections_index: usize,
     current_nest_level: i32,
     last: [@typeInfo(SectionID).Enum.fields.len]SectionID,
@@ -80,6 +80,21 @@ pub const Timer = struct {
             index -= 1;
         }
         return &timer.sections[index];
+    }
+
+    pub fn getNextSectionsIndex(timer: *Timer, index: usize) usize {
+        const result = (index + 1) % timer.sections.len;
+        return result;
+    }
+
+    pub fn getPrevSectionsIndex(timer: *Timer, index: usize) usize {
+        var result = index;
+        if (result == 0) {
+            result = timer.sections.len - 1;
+        } else {
+            result -= 1;
+        }
+        return result;
     }
 
     pub fn begin(timer: *Timer, id: SectionID) void {
