@@ -48,6 +48,7 @@ pub const V2i = V2(i32);
 pub const V2f = V2(f32);
 
 fn Rect2(comptime T: type) type {
+    const NumberType: type = if (T == V2i) i32 else f32;
     return struct {
         topleft: T = T{},
         dim: T = T{},
@@ -68,11 +69,34 @@ fn Rect2(comptime T: type) type {
                 else => @compileError("wrong conversion"),
             }
         }
+
+        pub fn outline(self: @This(), thickness: NumberType) Outline(@This()) {
+            const top = @This(){ .topleft = self.topleft, .dim = T{ .x = self.dim.x, .y = thickness } };
+            const bottom = @This(){ .topleft = T{ .x = self.topleft.x, .y = self.topleft.y + self.dim.y - thickness }, .dim = top.dim };
+            const left = @This(){ .topleft = T{.x = self.topleft.x, .y = self.topleft.y + thickness}, .dim = T{ .x = thickness, .y = self.dim.y - thickness * 2 } };
+            const right = @This(){ .topleft = T{ .x = self.topleft.x + self.dim.x - thickness, .y = left.topleft.y }, .dim = left.dim };
+            const result = Outline(@This()) {
+                .top = top,
+                .bottom = bottom,
+                .left = left,
+                .right = right,
+            };
+            return result;
+        }
     };
 }
 
 pub const Rect2i = Rect2(V2i);
 pub const Rect2f = Rect2(V2f);
+
+fn Outline(comptime T: type) type {
+    return struct {
+        top: T,
+        bottom: T,
+        left: T,
+        right: T,
+    };
+}
 
 pub const Color = struct {
     r: f32,

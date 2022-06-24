@@ -199,31 +199,19 @@ pub const Renderer = struct {
     }
 
     pub fn drawRectOutlineAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
-        const thickness = 2;
-
-        const top = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = rect.dim.x, .y = thickness } };
-        const bottom = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x, .y = rect.topleft.y + rect.dim.y - thickness }, .dim = top.dim };
-        const left = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = thickness, .y = rect.dim.y } };
-        const right = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x + rect.dim.x - thickness, .y = rect.topleft.y }, .dim = left.dim };
-
-        renderer.drawRectAA(top, color);
-        renderer.drawRectAA(bottom, color);
-        renderer.drawRectAA(left, color);
-        renderer.drawRectAA(right, color);
+        const outline = rect.outline(2);
+        renderer.drawRectAA(outline.top, color);
+        renderer.drawRectAA(outline.bottom, color);
+        renderer.drawRectAA(outline.left, color);
+        renderer.drawRectAA(outline.right, color);
     }
 
     pub fn drawRectOutlineNoAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
-        const thickness = 2;
-
-        const top = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = rect.dim.x, .y = thickness } };
-        const bottom = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x, .y = rect.topleft.y + rect.dim.y - thickness }, .dim = top.dim };
-        const left = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = thickness, .y = rect.dim.y } };
-        const right = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x + rect.dim.x - thickness, .y = rect.topleft.y }, .dim = left.dim };
-
-        renderer.drawRectNoAA(top, color);
-        renderer.drawRectNoAA(bottom, color);
-        renderer.drawRectNoAA(left, color);
-        renderer.drawRectNoAA(right, color);
+        const outline = rect.outline(2);
+        renderer.drawRectNoAA(outline.top, color);
+        renderer.drawRectNoAA(outline.bottom, color);
+        renderer.drawRectNoAA(outline.left, color);
+        renderer.drawRectNoAA(outline.right, color);
     }
 
     pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
