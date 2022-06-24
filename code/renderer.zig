@@ -212,6 +212,20 @@ pub const Renderer = struct {
         renderer.drawRectAA(right, color);
     }
 
+    pub fn drawRectOutlineNoAA(renderer: *Renderer, rect: math.Rect2f, color: math.Color) void {
+        const thickness = 2;
+
+        const top = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = rect.dim.x, .y = thickness } };
+        const bottom = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x, .y = rect.topleft.y + rect.dim.y - thickness }, .dim = top.dim };
+        const left = math.Rect2f{ .topleft = rect.topleft, .dim = math.V2f{ .x = thickness, .y = rect.dim.y } };
+        const right = math.Rect2f{ .topleft = math.V2f{ .x = rect.topleft.x + rect.dim.x - thickness, .y = rect.topleft.y }, .dim = left.dim };
+
+        renderer.drawRectNoAA(top, color);
+        renderer.drawRectNoAA(bottom, color);
+        renderer.drawRectNoAA(left, color);
+        renderer.drawRectNoAA(right, color);
+    }
+
     pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
         const glyph_info = renderer.font.getGlyphInfo(glyph);
         const glyph_screen_rect = math.Rect2f{ .topleft = topleft.add(glyph_info.offset.to(math.V2f)), .dim = glyph_info.coords.dim.to(math.V2f) };

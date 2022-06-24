@@ -47,6 +47,7 @@ pub const Timer = struct {
     last: [@typeInfo(SectionID).Enum.fields.len]SectionID,
     last_index: usize,
     min_sleep_ms: f32,
+    cycle_buffers: bool,
 
     pub fn new() Timer {
         var timer = Timer{
@@ -56,6 +57,7 @@ pub const Timer = struct {
             .last = undefined,
             .last_index = 0,
             .min_sleep_ms = platform.getMinSleepMs(),
+            .cycle_buffers = true,
         };
 
         for (timer.sections) |*set| {
@@ -114,7 +116,7 @@ pub const Timer = struct {
         const sections = timer.getCurrentFrameSections();
         sections.getPtr(last_id).end();
         timer.current_nest_level -= 1;
-        if (last_id == .frame) {
+        if (last_id == .frame and timer.cycle_buffers) {
             timer.sections_index = (timer.sections_index + 1) % timer.sections.len;
         }
     }

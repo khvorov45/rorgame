@@ -77,6 +77,10 @@ pub fn main() !void {
             rect_topleft_x += 0.5;
         }
 
+        if (input.pressed(.p)) {
+            timer.cycle_buffers = !timer.cycle_buffers;
+        }
+
         rect_topleft_x += 0.0;
         rect_topleft_y += 0.0;
 
@@ -221,6 +225,7 @@ fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: 
             .dim = math.V2f{ .x = @intToFloat(f32, column_count) * width_per_column, .y = height },
         };
         if (math.pointInRect(input.cursor_pos.to(math.V2f), bounding_rect)) {
+            renderer.drawRectOutlineNoAA(bounding_rect, math.Color{.r = 1, .g = 1, .b = 0, .a = 0.5});
             try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
         }
 

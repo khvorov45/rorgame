@@ -75,6 +75,7 @@ pub const Window = struct {
                         win.VK_F5 => .f5,
                         win.VK_LEFT => .left,
                         win.VK_RIGHT => .right,
+                        win.VK_P => .p,
                         else => null,
                     };
                     if (maybe_key) |key| {

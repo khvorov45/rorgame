@@ -48,6 +48,7 @@ pub const KeyID = enum {
     left,
     right,
     f5,
+    p,
 };
 
 pub const Key = struct {
