@@ -175,6 +175,7 @@ fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: 
 
     var sections_x_offset: f32 = 0;
     var sections_index = timer.getNextSectionsIndex(timer.sections_index);
+    var sections_to_print: ?*time.SectionsBuf = null;
     while (sections_index != timer.sections_index) : (sections_index = timer.getNextSectionsIndex(sections_index)) {
         const sections = &timer.sections[sections_index];
         var iter = sections.iterator();
@@ -226,10 +227,14 @@ fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: 
         };
         if (math.pointInRect(input.cursor_pos.to(math.V2f), bounding_rect)) {
             renderer.drawRectOutlineNoAA(bounding_rect, math.Color{.r = 1, .g = 1, .b = 0, .a = 0.5});
-            try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
+            sections_to_print = sections;
         }
 
         sections_x_offset += bounding_rect.dim.x;
+    }
+
+    if (sections_to_print) |sections| {
+        try printSectionTimes(sections, renderer, math.V2f{ .x = 0, .y = height }, colors[0..]);
     }
 }
 

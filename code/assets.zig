@@ -29,8 +29,10 @@ pub const TextureGroupID = enum {
 
 pub const GlyphInfo = struct {
     coords: math.Rect2i,
+    coords_outline: math.Rect2i,
     advance_x: i32,
     offset: math.V2i,
+    offset_outline: math.V2i,
 };
 
 pub const Font = struct {
@@ -213,6 +215,10 @@ pub const Assets = struct {
         _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
         const px_height_line = ft.FT_MulFix(ft_face.*.height, ft_face.*.size.*.metrics.y_scale) >> 6;
 
+        var stroker: ft.ftstroke.FT_Stroker = undefined;
+        _ = ft.ftstroke.FT_Stroker_New(@ptrCast(ft.ftstroke.FT_Library, ft_lib), &stroker);
+        ft.ftstroke.FT_Stroker_Set(stroker, 1 * 64, ft.ftstroke.FT_STROKER_LINECAP_ROUND, ft.ftstroke.FT_STROKER_LINEJOIN_ROUND, 0);
+
         var total_font_atlas_area: i32 = 0;
         {
             var ch_index: usize = 0;
@@ -220,6 +226,9 @@ pub const Assets = struct {
                 loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
                 const bm = ft_face.*.glyph.*.bitmap;
                 total_font_atlas_area += @intCast(i32, (bm.width + 2) * (bm.rows + 2));
+
+                const bm_outline = loadAndRenderFTOutlineBitmap(firstchar, ch_index, ft_face, stroker, px_height_font);
+                total_font_atlas_area += @intCast(i32, (bm_outline.bitmap.width + 2) * (bm_outline.bitmap.rows + 2));
             }
         }
 
@@ -238,11 +247,17 @@ pub const Assets = struct {
                 const char_dim = math.V2i{ .x = @intCast(i32, bm.width), .y = @intCast(i32, bm.rows) };
                 const builder_topleft = font_atlas_dim_builder.add(char_dim.add(math.V2i{ .x = 2, .y = 2 }));
 
+                const bm_outline = loadAndRenderFTOutlineBitmap(firstchar, ch_index, ft_face, stroker, px_height_font);
+                const outline_dim = math.V2i{ .x = @intCast(i32, bm_outline.bitmap.width), .y = @intCast(i32, bm_outline.bitmap.rows) };
+                const builder_topleft_outline = font_atlas_dim_builder.add(outline_dim.add(math.V2i{ .x = 2, .y = 2 }));
+
                 var glyph_info = &glyphs[ch_index];
                 glyph_info.* = GlyphInfo{
                     .coords = math.Rect2i{ .topleft = builder_topleft.add(math.V2i{ .x = 1, .y = 1 }), .dim = char_dim },
+                    .coords_outline = math.Rect2i{ .topleft = builder_topleft_outline.add(math.V2i{ .x = 1, .y = 1 }), .dim = outline_dim },
                     .advance_x = ft_face.*.glyph.*.advance.x >> 6,
                     .offset = math.V2i{ .x = ft_glyph.bitmap_left, .y = px_height_font - ft_glyph.bitmap_top },
+                    .offset_outline = bm_outline.offset,
                 };
             }
         }
@@ -260,21 +275,10 @@ pub const Assets = struct {
         for (glyphs) |glyph_info, ch_index| {
             loadAndRenderFTBitmap(firstchar, ch_index, ft_face);
             const bm = ft_face.*.glyph.*.bitmap;
+            copyFTBitmapToAtlas(bm, glyph_info.coords.topleft, font_atlas_dim.x, font_atlas_alpha);
 
-            var row: i32 = 0;
-            while (row < @intCast(i32, bm.rows)) : (row += 1) {
-                const atlas_row = row + glyph_info.coords.topleft.y;
-
-                var col: i32 = 0;
-                while (col < @intCast(i32, bm.width)) : (col += 1) {
-                    const atlas_col = col + glyph_info.coords.topleft.x;
-                    const tex_index = row * bm.pitch + col;
-                    const atlas_index = atlas_row * font_atlas_dim.x + atlas_col;
-
-                    const alpha = bm.buffer[@intCast(usize, tex_index)];
-                    font_atlas_alpha[@intCast(usize, atlas_index)] = alpha;
-                }
-            }
+            const bm_outline = loadAndRenderFTOutlineBitmap(firstchar, ch_index, ft_face, stroker, px_height_font);
+            copyFTBitmapToAtlas(bm_outline.bitmap, glyph_info.coords_outline.topleft, font_atlas_dim.x, font_atlas_alpha);
         }
 
         const result = Assets{ .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim }, .texture_groups = texture_groups, .font = Font{
@@ -287,12 +291,64 @@ pub const Assets = struct {
         return result;
     }
 
-    fn loadAndRenderFTBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face) void {
+    fn loadFTGlyph(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face) void {
         const ch = firstchar + @intCast(u32, ch_index);
         const ft_glyph_index = ft.FT_Get_Char_Index(ft_face, ch);
         _ = ft.FT_Load_Glyph(ft_face, ft_glyph_index, ft.FT_LOAD_DEFAULT);
+    }
+
+    fn loadAndRenderFTBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face) void {
+        loadFTGlyph(firstchar, ch_index, ft_face);
         if (ft_face.*.glyph.*.format != ft.FT_GLYPH_FORMAT_BITMAP) {
             _ = ft.FT_Render_Glyph(ft_face.*.glyph, ft.FT_RENDER_MODE_NORMAL);
+        }
+    }
+
+    const BitmapWithOffset = struct {
+        bitmap: ft.FT_Bitmap,
+        offset: math.V2i,
+    };
+
+    fn loadAndRenderFTOutlineBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face, stroker: ft.ftstroke.FT_Stroker, px_height_font: i32) BitmapWithOffset {
+        loadFTGlyph(firstchar, ch_index, ft_face);
+        var ft_glyph: ft.ftstroke.FT_Glyph = undefined;
+        _ = ft.ftstroke.FT_Get_Glyph(@ptrCast(ft.ftstroke.FT_GlyphSlot, ft_face.*.glyph), &ft_glyph);
+        var result = BitmapWithOffset{
+            .bitmap = ft.FT_Bitmap{.rows = 0, .width = 0, .pitch = 0, .buffer = 0, .num_grays = 0, .pixel_mode = 0, .palette_mode = 0, .palette = null},
+            .offset = math.V2i{.x = 0, .y = 0}, 
+        };
+        if (ft_glyph.*.format == ft.FT_GLYPH_FORMAT_OUTLINE) {
+            const ft_oglyph = @ptrCast(ft.ftstroke.FT_OutlineGlyph, ft_glyph);
+            const glyph_is_empty = ft_oglyph.*.outline.n_contours == 0 and ft_oglyph.*.outline.n_points == 0;
+            // NOTE(khvorov) Freetype crashes when rendering an empty outline
+            if (!glyph_is_empty) {
+                _ = ft.ftstroke.FT_Glyph_StrokeBorder(&ft_glyph, stroker, 0, 0);
+                _ = ft.ftstroke.FT_Glyph_To_Bitmap(&ft_glyph, ft.FT_RENDER_MODE_NORMAL, null, 1);
+                const bmglyph = @ptrCast(ft.ftstroke.FT_BitmapGlyph, ft_glyph);
+                const bitmap = @ptrCast(*ft.FT_Bitmap, &bmglyph.*.bitmap);
+                result = BitmapWithOffset{
+                    .bitmap = bitmap.*,
+                    .offset = math.V2i{.x = @as(i32, bmglyph.*.left), .y = px_height_font - @as(i32, bmglyph.*.top)},
+                };
+            }
+        }
+        return result;
+    }
+
+    fn copyFTBitmapToAtlas(bm: ft.FT_Bitmap, topleft: math.V2i, font_atlas_pitch: i32, font_atlas_alpha: []u8) void {
+        var row: i32 = 0;
+        while (row < @intCast(i32, bm.rows)) : (row += 1) {
+            const atlas_row = row + topleft.y;
+
+            var col: i32 = 0;
+            while (col < @intCast(i32, bm.width)) : (col += 1) {
+                const atlas_col = col + topleft.x;
+                const tex_index = row * bm.pitch + col;
+                const atlas_index = atlas_row * font_atlas_pitch + atlas_col;
+
+                const alpha = bm.buffer[@intCast(usize, tex_index)];
+                font_atlas_alpha[@intCast(usize, atlas_index)] = alpha;
+            }
         }
     }
 };

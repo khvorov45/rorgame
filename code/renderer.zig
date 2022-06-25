@@ -216,9 +216,16 @@ pub const Renderer = struct {
 
     pub fn drawGlyph(renderer: *Renderer, glyph: u21, topleft: math.V2f, color: math.Color) i32 {
         const glyph_info = renderer.font.getGlyphInfo(glyph);
+
         const glyph_screen_rect = math.Rect2f{ .topleft = topleft.add(glyph_info.offset.to(math.V2f)), .dim = glyph_info.coords.dim.to(math.V2f) };
+        const outline_screen_rect = math.Rect2f{ .topleft = topleft.add(glyph_info.offset_outline.to(math.V2f)), .dim = glyph_info.coords_outline.dim.to(math.V2f) };
+
         const glyph_tex_rect = glyph_info.coords.to(math.Rect2f);
+        const outline_tex_rect = glyph_info.coords_outline.to(math.Rect2f);
+
+        renderer.drawRectAlpha(outline_screen_rect, math.Color{.r = 0, .g = 0, .b = 0, .a = 1}, outline_tex_rect);
         renderer.drawRectAlpha(glyph_screen_rect, color, glyph_tex_rect);
+
         return glyph_info.advance_x;
     }
 
