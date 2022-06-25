@@ -215,9 +215,9 @@ pub const Assets = struct {
         _ = ft.FT_Set_Pixel_Sizes(ft_face, 0, px_height_font);
         const px_height_line = ft.FT_MulFix(ft_face.*.height, ft_face.*.size.*.metrics.y_scale) >> 6;
 
-        var stroker: ft.ftstroke.FT_Stroker = undefined;
-        _ = ft.ftstroke.FT_Stroker_New(@ptrCast(ft.ftstroke.FT_Library, ft_lib), &stroker);
-        ft.ftstroke.FT_Stroker_Set(stroker, 1 * 64, ft.ftstroke.FT_STROKER_LINECAP_ROUND, ft.ftstroke.FT_STROKER_LINEJOIN_ROUND, 0);
+        var stroker: ft.FT_Stroker = undefined;
+        _ = ft.FT_Stroker_New(ft_lib, &stroker);
+        ft.FT_Stroker_Set(stroker, 1 * 64, ft.FT_STROKER_LINECAP_ROUND, ft.FT_STROKER_LINEJOIN_ROUND, 0);
 
         var total_font_atlas_area: i32 = 0;
         {
@@ -309,23 +309,23 @@ pub const Assets = struct {
         offset: math.V2i,
     };
 
-    fn loadAndRenderFTOutlineBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face, stroker: ft.ftstroke.FT_Stroker, px_height_font: i32) BitmapWithOffset {
+    fn loadAndRenderFTOutlineBitmap(firstchar: u32, ch_index: usize, ft_face: ft.FT_Face, stroker: ft.FT_Stroker, px_height_font: i32) BitmapWithOffset {
         loadFTGlyph(firstchar, ch_index, ft_face);
-        var ft_glyph: ft.ftstroke.FT_Glyph = undefined;
-        _ = ft.ftstroke.FT_Get_Glyph(@ptrCast(ft.ftstroke.FT_GlyphSlot, ft_face.*.glyph), &ft_glyph);
+        var ft_glyph: ft.FT_Glyph = undefined;
+        _ = ft.FT_Get_Glyph(ft_face.*.glyph, &ft_glyph);
         var result = BitmapWithOffset{
             .bitmap = ft.FT_Bitmap{.rows = 0, .width = 0, .pitch = 0, .buffer = 0, .num_grays = 0, .pixel_mode = 0, .palette_mode = 0, .palette = null},
             .offset = math.V2i{.x = 0, .y = 0}, 
         };
         if (ft_glyph.*.format == ft.FT_GLYPH_FORMAT_OUTLINE) {
-            const ft_oglyph = @ptrCast(ft.ftstroke.FT_OutlineGlyph, ft_glyph);
+            const ft_oglyph = @ptrCast(ft.FT_OutlineGlyph, ft_glyph);
             const glyph_is_empty = ft_oglyph.*.outline.n_contours == 0 and ft_oglyph.*.outline.n_points == 0;
             // NOTE(khvorov) Freetype crashes when rendering an empty outline
             if (!glyph_is_empty) {
-                _ = ft.ftstroke.FT_Glyph_StrokeBorder(&ft_glyph, stroker, 0, 0);
-                _ = ft.ftstroke.FT_Glyph_To_Bitmap(&ft_glyph, ft.FT_RENDER_MODE_NORMAL, null, 1);
-                const bmglyph = @ptrCast(ft.ftstroke.FT_BitmapGlyph, ft_glyph);
-                const bitmap = @ptrCast(*ft.FT_Bitmap, &bmglyph.*.bitmap);
+                _ = ft.FT_Glyph_StrokeBorder(&ft_glyph, stroker, 0, 0);
+                _ = ft.FT_Glyph_To_Bitmap(&ft_glyph, ft.FT_RENDER_MODE_NORMAL, null, 1);
+                const bmglyph = @ptrCast(ft.FT_BitmapGlyph, ft_glyph);
+                const bitmap = &bmglyph.*.bitmap;
                 result = BitmapWithOffset{
                     .bitmap = bitmap.*,
                     .offset = math.V2i{.x = @as(i32, bmglyph.*.left), .y = px_height_font - @as(i32, bmglyph.*.top)},
