@@ -282,6 +282,8 @@ pub const Assets = struct {
             copyFTBitmapToAtlas(bm_outline.bitmap, glyph_info.coords_outline.topleft, font_atlas_dim.x, font_atlas_alpha);
         }
 
+        _ = ft.FT_Done_FreeType(ft_lib);
+
         const result = Assets{ .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim }, .texture_groups = texture_groups, .font = Font{
             .px_height_font = px_height_font,
             .px_height_line = px_height_line,
