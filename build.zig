@@ -66,7 +66,9 @@ pub fn build(b: *std.build.Builder) void {
         "pshinter/pshinter.c",
         "psnames/psnames.c",
     };
-    const freetype_flags = &[_][]const u8{ "-g", "-O0", "-DFT2_BUILD_LIBRARY" };
+    const freetype_flags = &[_][]const u8{ "-DFT2_BUILD_LIBRARY" };
+    freetype.setTarget(target);
+    freetype.setBuildMode(mode);
     inline for (freetype_files) |file| {
         freetype.addCSourceFile("code/freetype/src/" ++ file, freetype_flags);
     }
@@ -93,7 +95,9 @@ pub fn build(b: *std.build.Builder) void {
         "uncompr.c",
         "zutil.c",
     };
-    const zlib_flags = &[_][]const u8{ "-g", "-O0" };
+    const zlib_flags = &[_][]const u8{};
+    zlib.setTarget(target);
+    zlib.setBuildMode(mode);
     inline for (zlib_files) |file| {
         zlib.addCSourceFile("code/zlib/" ++ file, zlib_flags);
     }
