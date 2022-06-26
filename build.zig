@@ -9,7 +9,6 @@ pub fn build(b: *std.build.Builder) void {
     const freetype_include_path = "code/freetype/include";
     freetype.addSystemIncludePath(freetype_include_path);
 
-    // "-DFT_CONFIG_STANDARD_LIBRARY_H=<freetype/config/ftstdlib_nocrt.h>"
     const freetype_files = [_][]const u8{
         // Required
         "base/ftsystem.c",
@@ -73,9 +72,38 @@ pub fn build(b: *std.build.Builder) void {
     }
     freetype.linkLibC();
 
+    const zlib = b.addStaticLibrary("zlib", null);
+    const zlib_include_path = "code/zlib";
+    zlib.addSystemIncludePath(zlib_include_path);
+
+    const zlib_files = [_][]const u8{
+        "adler32.c",
+        "compress.c",
+        "crc32.c",
+        "deflate.c",
+        "gzclose.c",
+        "gzlib.c",
+        "gzread.c",
+        "gzwrite.c",
+        "infback.c",
+        "inffast.c",
+        "inflate.c",
+        "inftrees.c",
+        "trees.c",
+        "uncompr.c",
+        "zutil.c",
+    };
+    const zlib_flags = &[_][]const u8{ "-g", "-O0" };
+    inline for (zlib_files) |file| {
+        zlib.addCSourceFile("code/zlib/" ++ file, zlib_flags);
+    }
+    zlib.linkLibC();
+
     const exe = b.addExecutable("rorgame", "code/rorgame.zig");
     exe.addSystemIncludePath(freetype_include_path); // NOTE(khvorov) For bindings
+    exe.addSystemIncludePath(zlib_include_path); // NOTE(khvorov) For bindings
     exe.linkLibrary(freetype);
+    exe.linkLibrary(zlib);
     exe.subsystem = .Windows;
     exe.setTarget(target);
     exe.setBuildMode(mode);

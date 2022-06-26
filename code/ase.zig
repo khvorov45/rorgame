@@ -3,7 +3,7 @@ const assert = std.debug.assert;
 
 const log = @import("log.zig");
 const math = @import("math.zig");
-const zlib = @import("zlib.zig");
+const zlib = @import("zlib/zlib_bindings.zig");
 const mem = @import("mem.zig");
 const byteio = @import("byteio.zig");
 
@@ -277,7 +277,26 @@ fn parseCel(chunk_data_init: []u8, bits_per_pixel: i32, allocator: mem.Allocator
     }
 
     var decompressed = try allocator.alloc(u8, @intCast(usize, dim.x * dim.y * @divExact(bits_per_pixel, 8)));
-    try zlib.decompress(chunk_data, decompressed);
+
+    var decompression_stream = zlib.z_stream{
+        .next_in = chunk_data.ptr,
+        .avail_in = @intCast(c_uint, chunk_data.len),
+        .total_in = 0,
+        .next_out = decompressed.ptr,
+        .avail_out = @intCast(c_uint, decompressed.len),
+        .total_out = 0,
+        .msg = null,
+        .state = null,
+        .zalloc = null,
+        .zfree = null,
+        .opaque_ = null,
+        .data_type = 0,
+        .adler = 0,
+        .reserved = 0,
+    };
+    if (zlib.inflateInit(&decompression_stream) != zlib.Z_OK) return error.inflateInit;
+    defer _ = zlib.inflateEnd(&decompression_stream);
+    if (zlib.inflate(&decompression_stream, zlib.Z_FINISH) != zlib.Z_STREAM_END) return error.inflate;
 
     const result = Cel{
         .layer_index = @intCast(i32, layer_index),
