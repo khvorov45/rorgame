@@ -43,6 +43,6 @@ pub fn readU8(buffer: *[]u8) u8 {
 
 pub fn readI16le(buffer: *[]u8) i16 {
     const word = readU16le(buffer);
-    const result = @intCast(i16, word);
+    const result = @bitCast(i16, @intCast(u16, word));
     return result;
 }

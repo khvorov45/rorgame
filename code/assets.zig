@@ -22,6 +22,7 @@ pub const TextureAlpha = struct {
 };
 
 pub const TextureGroupID = enum {
+    blue_stars,
     commando_idle,
     commando_walk,
     commando_use_skill1,

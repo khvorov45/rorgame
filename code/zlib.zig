@@ -1,4 +1,6 @@
-const panic = @import("std").debug.panic;
+const std = @import("std");
+const panic = std.debug.panic;
+const assert = std.debug.assert;
 
 const log = @import("log.zig");
 const mem = @import("mem.zig");
@@ -217,7 +219,72 @@ fn inflate(input: []u8, output: []u8) !void {
         switch (block_type) {
             0 => try inflator.readNotCompressed(),
             1 => try inflator.readCompressed(&fixed.len, &fixed.dist),
-            2 => panic("dynamic unimplemented", .{}),
+            2 => {
+
+                const order = [19]u16{16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+
+                const nlen = inflator.readBits(5) + 257;
+                const ndist = inflator.readBits(5) + 1;
+                const ncode = inflator.readBits(4) + 4;
+                assert(nlen <= MAXLCODES and ndist <= MAXDCODES and ncode < order.len);
+
+                var lengths: [MAXCODES]u16 = undefined;
+                {
+                    var code_index: usize = 0;
+                    while (code_index < ncode) : (code_index += 1) {
+                        const length_index = order[code_index];
+                        lengths[length_index] = @intCast(u16, inflator.readBits(3));
+                    }
+                    while (code_index < order.len) : (code_index += 1) {
+                        const length_index = order[code_index];
+                        lengths[length_index] = 0;
+                    }
+                }
+
+                var len_symbols: [MAXLCODES]u16 = undefined;
+                const temp_len_table = Huffman.fromLengths(lengths[0..order.len], len_symbols[0..]);
+
+                {
+                    var index: usize = 0;
+                    while (index < nlen + ndist) {
+                        const symbol = inflator.decode(&temp_len_table) orelse return error.FailedToDecode;
+                        var last_length: u16 = 0;
+
+                        if (symbol < 16) {
+                            lengths[index] = @intCast(u16, symbol);
+                            index += 1;
+                        } else {
+                            last_length = 0;
+                            var to_repeat: u32 = 0;
+
+                            if (symbol == 16) {
+                                if (index == 0) return error.NoLastLength;
+                                last_length = lengths[index - 1];
+                            } else if (symbol == 17) {
+                                to_repeat = 3 + inflator.readBits(3);
+                            } else {
+                                to_repeat = 11 + inflator.readBits(7);
+                            }
+
+                            if (index + to_repeat > nlen + ndist) return error.TooManyLengths;
+
+                            while (to_repeat > 0) : (to_repeat -= 1) {
+                                lengths[index] = last_length;
+                                index += 1;
+                            }
+                        }
+                    }
+                }
+
+                if (lengths[256] == 0) return error.NoEndOfBlockCode;
+
+                const len_table = Huffman.fromLengths(lengths[0..nlen], len_symbols[0..]);
+
+                var dist_symbols: [MAXDCODES]u16 = undefined;
+                const dist_table = Huffman.fromLengths(lengths[nlen..][0..ndist], dist_symbols[0..]);
+
+                try inflator.readCompressed(&len_table, &dist_table);
+            },
             else => return error.BadBlockType,
         }
         _ = block_type;

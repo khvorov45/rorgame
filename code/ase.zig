@@ -59,8 +59,18 @@ pub fn parse(buffer_init: []u8, allocator: mem.Allocator) ![]Texture {
                                 const px_value = byteio.readRGBAasARGB(&decompressed);
                                 const px_index = px_row * texture.dim.x + px_col;
 
-                                // TODO(khvorov) Alpha
-                                texture.pixels[@intCast(usize, px_index)] = px_value;
+                                // NOTE(khvorov) Alpha is not premultiplied so this will likely not produce correct results
+                                // if the final color is supposed to have any transparency on it. I don't have sprites like
+                                // that, so I'm not fixing that right now.
+                                var px = &texture.pixels[@intCast(usize, px_index)];
+
+                                const old_col = math.Color.fromU32ARGB(px.*);
+                                const new_col = math.Color.fromU32ARGB(px_value);
+
+                                const blend = new_col.mul(new_col.a).add(old_col.mul(1 - new_col.a));
+                                const blend32 = blend.toU32ARGB();
+
+                                texture.pixels[@intCast(usize, px_index)] = blend32;
 
                                 if (px_col + 1 == cel.pos.x + cel.dim.x) {
                                     px_col = cel.pos.x;
