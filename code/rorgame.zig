@@ -158,7 +158,7 @@ pub fn main() !void {
 
         timer.begin(.display_pixels);
         last_clock_before_display = time.getCurrentClock();
-        window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim);
+        window.displayPixels(renderer.draw_buffer.pixels, renderer.draw_buffer.dim, renderer.draw_buffer.pitch);
         timer.end();
 
         timer.end(); // NOTE(khvorov) frame
@@ -239,7 +239,7 @@ fn displayTimings(timer: *time.Timer, renderer: *rdr.Renderer, target_frame_ms: 
             .dim = math.V2f{ .x = @intToFloat(f32, column_count) * width_per_column, .y = height },
         };
         if (math.pointInRect(input.cursor_pos.to(math.V2f), bounding_rect)) {
-            renderer.drawRectOutlineNoAA(bounding_rect, math.Color{.r = 1, .g = 1, .b = 0, .a = 0.5});
+            renderer.drawRectOutlineNoAA(bounding_rect, math.Color{ .r = 1, .g = 1, .b = 0, .a = 0.5 });
             sections_to_print = sections;
         }
 

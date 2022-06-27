@@ -66,7 +66,7 @@ pub fn build(b: *std.build.Builder) void {
         "pshinter/pshinter.c",
         "psnames/psnames.c",
     };
-    const freetype_flags = &[_][]const u8{ "-DFT2_BUILD_LIBRARY" };
+    const freetype_flags = &[_][]const u8{"-DFT2_BUILD_LIBRARY"};
     freetype.setTarget(target);
     freetype.setBuildMode(mode);
     inline for (freetype_files) |file| {

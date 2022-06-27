@@ -37,6 +37,7 @@ pub fn parse(buffer_init: []u8, allocator: mem.Allocator) ![]Texture {
         texture.* = Texture{
             .pixels = try allocator.alloc(u32, @intCast(usize, header.dim.x * header.dim.y)),
             .dim = header.dim,
+            .pitch = header.dim.x,
         };
         for (texture.pixels) |*px| {
             px.* = 0;
@@ -57,7 +58,7 @@ pub fn parse(buffer_init: []u8, allocator: mem.Allocator) ![]Texture {
                         switch (header.bits_per_pixel) {
                             32 => {
                                 const px_value = byteio.readRGBAasARGB(&decompressed);
-                                const px_index = px_row * texture.dim.x + px_col;
+                                const px_index = px_row * texture.pitch + px_col;
 
                                 // NOTE(khvorov) Alpha is not premultiplied so this will likely not produce correct results
                                 // if the final color is supposed to have any transparency on it. I don't have sprites like

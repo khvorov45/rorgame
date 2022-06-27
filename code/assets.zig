@@ -14,6 +14,7 @@ const ft = @import("freetype/freetype_bindings.zig");
 pub const Texture = struct {
     pixels: []u32,
     dim: math.V2i,
+    pitch: i32,
 };
 
 pub const TextureAlpha = struct {
@@ -117,7 +118,7 @@ pub const Assets = struct {
                     while (row < texture.dim.y) : (row += 1) {
                         var col: i32 = 0;
                         while (col < texture.dim.x) : (col += 1) {
-                            const texel_index = row * texture.dim.x + col;
+                            const texel_index = row * texture.pitch + col;
                             if (texture.pixels[@intCast(usize, texel_index)] != 0) {
                                 first_filled_col = @minimum(first_filled_col, col);
                                 first_filled_row = @minimum(first_filled_row, row);
@@ -187,7 +188,7 @@ pub const Assets = struct {
                     var col: i32 = filled_rect.topleft.x;
                     while (col < filled_rect.topleft.x + filled_rect.dim.x) : (col += 1) {
                         const atlas_col = (col - filled_rect.topleft.x) + atlas_topleft.x;
-                        const tex_index = row * texture.dim.x + col;
+                        const tex_index = row * texture.pitch + col;
                         const atlas_index = atlas_row * atlas_dim.x + atlas_col;
 
                         const texel = texture.pixels[@intCast(usize, tex_index)];
@@ -284,7 +285,7 @@ pub const Assets = struct {
 
         _ = ft.FT_Done_FreeType(ft_lib);
 
-        const result = Assets{ .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim }, .texture_groups = texture_groups, .font = Font{
+        const result = Assets{ .atlas = Texture{ .pixels = atlas_pixels, .dim = atlas_dim, .pitch = atlas_dim.x }, .texture_groups = texture_groups, .font = Font{
             .px_height_font = px_height_font,
             .px_height_line = px_height_line,
             .alphamap = TextureAlpha{ .alpha = font_atlas_alpha, .dim = font_atlas_dim },
@@ -317,8 +318,8 @@ pub const Assets = struct {
         var ft_glyph: ft.FT_Glyph = undefined;
         _ = ft.FT_Get_Glyph(ft_face.*.glyph, &ft_glyph);
         var result = BitmapWithOffset{
-            .bitmap = ft.FT_Bitmap{.rows = 0, .width = 0, .pitch = 0, .buffer = 0, .num_grays = 0, .pixel_mode = 0, .palette_mode = 0, .palette = null},
-            .offset = math.V2i{.x = 0, .y = 0}, 
+            .bitmap = ft.FT_Bitmap{ .rows = 0, .width = 0, .pitch = 0, .buffer = 0, .num_grays = 0, .pixel_mode = 0, .palette_mode = 0, .palette = null },
+            .offset = math.V2i{ .x = 0, .y = 0 },
         };
         if (ft_glyph.*.format == ft.FT_GLYPH_FORMAT_OUTLINE) {
             const ft_oglyph = @ptrCast(ft.FT_OutlineGlyph, ft_glyph);
@@ -331,7 +332,7 @@ pub const Assets = struct {
                 const bitmap = &bmglyph.*.bitmap;
                 result = BitmapWithOffset{
                     .bitmap = bitmap.*,
-                    .offset = math.V2i{.x = @as(i32, bmglyph.*.left), .y = px_height_font - @as(i32, bmglyph.*.top)},
+                    .offset = math.V2i{ .x = @as(i32, bmglyph.*.left), .y = px_height_font - @as(i32, bmglyph.*.top) },
                 };
             }
         }

@@ -17,9 +17,22 @@ pub const Renderer = struct {
     font: *const Font,
 
     pub fn new(dim: math.V2i, atlas: Texture, font: *const Font, allocator: mem.Allocator) !Renderer {
+        const row_align = 16;
+        const dim_x_aligned = dimx: {
+            const px_align = @divExact(row_align, @sizeOf(u32));
+            const off_by = dim.x & (px_align - 1);
+            var px_in_row = dim.x;
+            if (off_by > 0) {
+                const to_add = px_align - off_by;
+                px_in_row += to_add;
+            }
+            break :dimx px_in_row;
+        };
+
         const draw_buf = Texture{
-            .pixels = try allocator.alloc(u32, @intCast(usize, dim.x * dim.y)),
+            .pixels = try allocator.allocWithOptions(u32, @intCast(usize, dim_x_aligned * dim.y), row_align, null),
             .dim = dim,
+            .pitch = dim_x_aligned,
         };
         return Renderer{ .draw_buffer = draw_buf, .atlas = atlas, .font = font };
     }
@@ -46,7 +59,7 @@ pub const Renderer = struct {
         while (row < @floatToInt(i32, bottomright_aligned.y)) : (row += 1) {
             var col = @floatToInt(i32, topleft_aligned.x);
             while (col < @floatToInt(i32, bottomright_aligned.x)) : (col += 1) {
-                const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
+                const px_index = @intCast(usize, row * renderer.draw_buffer.pitch + col);
                 renderer.draw_buffer.pixels[px_index] = color32;
             }
         }
@@ -70,7 +83,7 @@ pub const Renderer = struct {
 
                 const final_color = math.Color{ .r = color.r, .g = color.g, .b = color.b, .a = color.a * (1 - alpha_reduce_h) * (1 - alpha_reduce_v) };
 
-                const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
+                const px_index = @intCast(usize, row * renderer.draw_buffer.pitch + col);
                 const old_px = &renderer.draw_buffer.pixels[px_index];
                 const old_col = math.Color.fromU32ARGB(old_px.*);
                 const new_col = final_color.mul(final_color.a).add(old_col.mul(1 - final_color.a));
@@ -109,10 +122,10 @@ pub const Renderer = struct {
                 const tex_col_right = @floatToInt(i32, tex_colf_right);
                 const tex_row_bottom = @floatToInt(i32, tex_rowf_bottom);
 
-                const tex_index_topleft = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_left);
-                const tex_index_topright = @intCast(usize, tex_row_top * renderer.atlas.dim.x + tex_col_right);
-                const tex_index_bottomleft = @intCast(usize, tex_row_bottom * renderer.atlas.dim.x + tex_col_left);
-                const tex_index_bottomright = @intCast(usize, tex_row_bottom * renderer.atlas.dim.x + tex_col_right);
+                const tex_index_topleft = @intCast(usize, tex_row_top * renderer.atlas.pitch + tex_col_left);
+                const tex_index_topright = @intCast(usize, tex_row_top * renderer.atlas.pitch + tex_col_right);
+                const tex_index_bottomleft = @intCast(usize, tex_row_bottom * renderer.atlas.pitch + tex_col_left);
+                const tex_index_bottomright = @intCast(usize, tex_row_bottom * renderer.atlas.pitch + tex_col_right);
 
                 const texel_topleft_u32 = renderer.atlas.pixels[tex_index_topleft];
                 const texel_topright_u32 = renderer.atlas.pixels[tex_index_topright];
@@ -131,7 +144,7 @@ pub const Renderer = struct {
                 const blend_bottom = texel_bottomleft.transitionBlend(px_on_left, texel_bottomright);
                 const blend = blend_top.transitionBlend(px_on_top, blend_bottom);
 
-                const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
+                const px_index = @intCast(usize, row * renderer.draw_buffer.pitch + col);
                 const old_px = &renderer.draw_buffer.pixels[px_index];
                 const old_col = math.Color.fromU32ARGB(old_px.*);
                 const new_col = blend.mul(blend.a).add(old_col.mul(1 - blend.a));
@@ -188,7 +201,7 @@ pub const Renderer = struct {
                 const blend_bottom = texel_bottomleft.lerp(tex_from_left, texel_bottomright);
                 const blend = blend_top.lerp(tex_from_top, blend_bottom);
 
-                const px_index = @intCast(usize, row * renderer.draw_buffer.dim.x + col);
+                const px_index = @intCast(usize, row * renderer.draw_buffer.pitch + col);
                 const old_px = &renderer.draw_buffer.pixels[px_index];
                 const old_col = math.Color.fromU32ARGB(old_px.*);
                 const new_col = blend.mul(blend.a).add(old_col.mul(1 - blend.a));
@@ -223,7 +236,7 @@ pub const Renderer = struct {
         const glyph_tex_rect = glyph_info.coords.to(math.Rect2f);
         const outline_tex_rect = glyph_info.coords_outline.to(math.Rect2f);
 
-        renderer.drawRectAlpha(outline_screen_rect, math.Color{.r = 0, .g = 0, .b = 0, .a = 1}, outline_tex_rect);
+        renderer.drawRectAlpha(outline_screen_rect, math.Color{ .r = 0, .g = 0, .b = 0, .a = 1 }, outline_tex_rect);
         renderer.drawRectAlpha(glyph_screen_rect, color, glyph_tex_rect);
 
         return glyph_info.advance_x;

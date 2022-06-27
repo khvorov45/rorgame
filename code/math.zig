@@ -73,9 +73,9 @@ fn Rect2(comptime T: type) type {
         pub fn outline(self: @This(), thickness: NumberType) Outline(@This()) {
             const top = @This(){ .topleft = self.topleft, .dim = T{ .x = self.dim.x, .y = thickness } };
             const bottom = @This(){ .topleft = T{ .x = self.topleft.x, .y = self.topleft.y + self.dim.y - thickness }, .dim = top.dim };
-            const left = @This(){ .topleft = T{.x = self.topleft.x, .y = self.topleft.y + thickness}, .dim = T{ .x = thickness, .y = self.dim.y - thickness * 2 } };
+            const left = @This(){ .topleft = T{ .x = self.topleft.x, .y = self.topleft.y + thickness }, .dim = T{ .x = thickness, .y = self.dim.y - thickness * 2 } };
             const right = @This(){ .topleft = T{ .x = self.topleft.x + self.dim.x - thickness, .y = left.topleft.y }, .dim = left.dim };
-            const result = Outline(@This()) {
+            const result = Outline(@This()){
                 .top = top,
                 .bottom = bottom,
                 .left = left,

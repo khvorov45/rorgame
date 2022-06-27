@@ -106,8 +106,8 @@ pub const Window = struct {
         input.cursor_pos = math.V2i{ .x = point.x, .y = point.y };
     }
 
-    pub fn displayPixels(window: *Window, pixels: []u32, pixels_dim: math.V2i) void {
-        window.platform.bmi.bmiHeader.biWidth = pixels_dim.x;
+    pub fn displayPixels(window: *Window, pixels: []u32, pixels_dim: math.V2i, pixels_pitch: i32) void {
+        window.platform.bmi.bmiHeader.biWidth = pixels_pitch;
         window.platform.bmi.bmiHeader.biHeight = -pixels_dim.y; // NOTE(khvorov) Negative = top-down
         _ = win.StretchDIBits(
             window.platform.hdc,
