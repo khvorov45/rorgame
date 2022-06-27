@@ -116,8 +116,14 @@ pub const Timer = struct {
         const sections = timer.getCurrentFrameSections();
         sections.getPtr(last_id).end();
         timer.current_nest_level -= 1;
-        if (last_id == .frame and timer.cycle_buffers) {
-            timer.sections_index = (timer.sections_index + 1) % timer.sections.len;
+        if (last_id == .frame) {
+            if (timer.cycle_buffers) {
+                timer.sections_index = (timer.sections_index + 1) % timer.sections.len;
+            }
+            var iter = timer.sections[timer.sections_index].iterator();
+            while (iter.next()) |entry| {
+                entry.value.ms = null;
+            }
         }
     }
 
