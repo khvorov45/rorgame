@@ -29,7 +29,7 @@ pub const SectionID = enum {
     input,
     update,
     clear_buffers,
-    animation,
+    scene,
     debug_atlases,
     debug_timings,
     wait,

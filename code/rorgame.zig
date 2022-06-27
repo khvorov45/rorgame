@@ -40,7 +40,7 @@ pub fn main() !void {
     var rect_topleft_y: f32 = 600;
     var temp_frame_index: usize = 0;
     var frame_index: usize = 0;
-    var debug_overlay = false;
+    var debug_overlay = true;
 
     var timer = time.Timer.new();
     const target_frame_ms: f32 = 1000.0 / 60.0;
@@ -96,7 +96,18 @@ pub fn main() !void {
         renderer.clearBuffers();
         timer.end();
 
-        timer.begin(.animation);
+        timer.begin(.scene);
+
+        const background = assets.texture_groups.get(.blue_stars)[0];
+        var background_rect = math.Rect2f{ .topleft = math.V2f{ .x = 0, .y = 0 }, .dim = background.dim.mulf(5) };
+        while (background_rect.topleft.y < @intToFloat(f32, renderer.draw_buffer.dim.y)) {
+            background_rect.topleft.x = 0;
+            while (background_rect.topleft.x < @intToFloat(f32, renderer.draw_buffer.dim.x)) {
+                renderer.drawRectTex(background_rect, background);
+                background_rect.topleft.x += background_rect.dim.x;
+            }
+            background_rect.topleft.y += background_rect.dim.y;
+        }
 
         const req_group = assets.texture_groups.get(.commando_walk);
         const req_tex = req_group[frame_index];
