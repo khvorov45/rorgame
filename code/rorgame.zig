@@ -40,6 +40,7 @@ pub fn main() !void {
     var rect_topleft_y: f32 = 600;
     var temp_frame_index: usize = 0;
     var frame_index: usize = 0;
+    var debug_overlay = false;
 
     var timer = time.Timer.new();
     const target_frame_ms: f32 = 1000.0 / 60.0;
@@ -64,6 +65,10 @@ pub fn main() !void {
 
         timer.begin(.update);
 
+        if (input.pressed(.f1)) {
+            debug_overlay = !debug_overlay;
+        }
+
         if (input.pressed(.f5)) {
             assets_arena.used = 0;
             assets = try Assets.fromSources(assets_arena_allocator);
@@ -80,9 +85,6 @@ pub fn main() !void {
         if (input.pressed(.p)) {
             timer.cycle_buffers = !timer.cycle_buffers;
         }
-
-        rect_topleft_x += 0.0;
-        rect_topleft_y += 0.0;
 
         timer.end();
 
@@ -109,15 +111,15 @@ pub fn main() !void {
 
         timer.end();
 
-        if (true) {
+        if (debug_overlay) {
             timer.begin(.debug_atlases);
             renderer.drawWholeAtlas(math.V2f{ .x = 500, .y = 200 });
             timer.end();
-        }
 
-        timer.begin(.debug_timings);
-        try displayTimings(&timer, &renderer, target_frame_ms, &input);
-        timer.end();
+            timer.begin(.debug_timings);
+            try displayTimings(&timer, &renderer, target_frame_ms, &input);
+            timer.end();
+        }
 
         timer.end(); // NOTE(khvorov) work
 

@@ -72,7 +72,17 @@ pub const Window = struct {
             switch (msg.message) {
                 win.WM_KEYDOWN, win.WM_KEYUP => {
                     const maybe_key: ?KeyID = switch (msg.wParam) {
+                        win.VK_F1 => .f1,
+                        win.VK_F2 => .f2,
+                        win.VK_F3 => .f3,
+                        win.VK_F4 => .f4,
                         win.VK_F5 => .f5,
+                        win.VK_F6 => .f6,
+                        win.VK_F7 => .f7,
+                        win.VK_F8 => .f8,
+                        win.VK_F9 => .f9,
+                        win.VK_F10 => .f10,
+                        win.VK_F11 => .f11,
                         win.VK_LEFT => .left,
                         win.VK_RIGHT => .right,
                         win.VK_P => .p,
